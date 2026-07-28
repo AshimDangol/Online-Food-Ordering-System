@@ -9,15 +9,24 @@ import com.foodordering.model.User;
  * CUSTOMER/ADMIN roles. All requests are logged with user details.
  */
 public class AuthProxy implements IOrderService {
-    private OrderService realService;
-    private User currentUser;
+    private final OrderService realService;
+    private final User currentUser;
 
     /**
      * @param currentUser The user on whose behalf operations are performed
+     * @param realService Shared OrderService instance for data consistency
+     */
+    public AuthProxy(User currentUser, OrderService realService) {
+        this.realService = realService;
+        this.currentUser = currentUser;
+    }
+
+    /**
+     * Creates an AuthProxy with a new OrderService (for backward compatibility/testing).
+     * @param currentUser The user on whose behalf operations are performed
      */
     public AuthProxy(User currentUser) {
-        this.realService = new OrderService();
-        this.currentUser = currentUser;
+        this(currentUser, new OrderService());
     }
 
     @Override

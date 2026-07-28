@@ -377,4 +377,67 @@ class FoodOrderingSystemTest {
     }
 
     private static List<Order> orderHistoryDummy = new ArrayList<>();
+
+    // ===================== DATABASE TESTS =====================
+
+    @Test
+    @org.junit.jupiter.api.Order(16)
+    @DisplayName("Database - User registration and authentication")
+    void testDatabaseUserAuth() {
+        com.foodordering.db.DatabaseManager.getInstance();
+        String ts = String.valueOf(System.currentTimeMillis());
+        String testId = "DB-AUTH-" + ts.substring(ts.length() - 6);
+        String testEmail = "dbtest" + ts.substring(ts.length() - 6) + "@test.com";
+
+        UserFactory cf = new CustomerFactory();
+        Customer customer = (Customer) cf.createUser(testId, "DB User", testEmail,
+                "9800000000|Test Address");
+
+        com.foodordering.db.UserDAO userDAO = new com.foodordering.db.UserDAO();
+        boolean registered = userDAO.registerUser(customer, "password123");
+        assertTrue(registered, "User should be registered");
+
+        User authenticated = userDAO.authenticate(testEmail, "password123");
+        assertNotNull(authenticated, "Should authenticate with correct password");
+        assertEquals("DB User", authenticated.getName());
+
+        User wrong = userDAO.authenticate(testEmail, "wrongpassword");
+        assertNull(wrong, "Should not authenticate with wrong password");
+    }
+
+    @Test
+    @org.junit.jupiter.api.Order(17)
+    @DisplayName("Database - Save and retrieve orders")
+    void testDatabaseOrderPersistence() {
+        com.foodordering.db.DatabaseManager.getInstance();
+        String ts = String.valueOf(System.currentTimeMillis());
+        String custId = "DB-ORD-" + ts.substring(ts.length() - 6);
+        String email = "ordertest" + ts.substring(ts.length() - 6) + "@test.com";
+
+        com.foodordering.db.UserDAO userDAO = new com.foodordering.db.UserDAO();
+        com.foodordering.db.OrderDAO orderDAO = new com.foodordering.db.OrderDAO();
+
+        UserFactory cf = new CustomerFactory();
+        Customer cust = (Customer) cf.createUser(custId, "Order User", email,
+                "9800000000|Ktm");
+        userDAO.registerUser(cust, "pass");
+
+        Customer orderCustomer = (Customer) userDAO.findById(custId);
+        assertNotNull(orderCustomer);
+
+        MenuItem item = new BaseMenuItem("Test Item", 200.0);
+        OrderBuilder builder = new OrderBuilder(orderCustomer)
+                .addItem(item, 2)
+                .setDeliveryStrategy(new StandardDeliveryStrategy(), 5.0)
+                .setPaymentMethod("KHALTI");
+        Order order = builder.build();
+
+        boolean saved = orderDAO.saveOrder(order);
+        assertTrue(saved, "Order should be saved to database");
+
+        List<Order> orders = orderDAO.findByCustomerId(custId);
+        assertFalse(orders.isEmpty(), "Should find saved orders");
+        assertTrue(orders.stream().anyMatch(o -> o.getOrderId().equals(order.getOrderId())),
+                "Saved order should be retrievable");
+    }
 }

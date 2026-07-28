@@ -1,5 +1,7 @@
 package com.foodordering.adapter;
 
+import com.foodordering.config.RestaurantConfig;
+
 /**
  * Adapter Pattern — Adapter.
  * Wraps incompatible payment gateway interfaces (Khalti, eSewa, PayPal)
@@ -8,42 +10,39 @@ package com.foodordering.adapter;
  * regardless of which gateway is actually being used.
  */
 public class PaymentAdapter implements PaymentGateway {
-    private KhaltiGateway khaltiGateway;
-    private ESewaGateway eSewaGateway;
-    private PayPalGateway payPalGateway;
-    private String type;
+    private static final double USD_TO_NPR_RATE = 135.0;
+
+    private final String type;
+    private Object gateway;
 
     /**
      * Creates an adapter for the specified payment gateway type.
      * @param type One of "KHALTI", "ESEWA", or "PAYPAL"
      */
     public PaymentAdapter(String type) {
-        this.type = type;
-        switch (type.toUpperCase()) {
-            case "KHALTI":
-                khaltiGateway = new KhaltiGateway();
-                break;
-            case "ESEWA":
-                eSewaGateway = new ESewaGateway();
-                break;
-            case "PAYPAL":
-                payPalGateway = new PayPalGateway();
-                break;
-            default:
-                throw new IllegalArgumentException("Unknown gateway: " + type);
+        this.type = type.toUpperCase();
+        initGateway();
+    }
+
+    private void initGateway() {
+        switch (type) {
+            case "KHALTI" -> gateway = new KhaltiGateway();
+            case "ESEWA" -> gateway = new ESewaGateway();
+            case "PAYPAL" -> gateway = new PayPalGateway();
+            default -> throw new IllegalArgumentException("Unknown gateway: " + type);
         }
     }
 
     @Override
     public boolean processPayment(double amount) {
-        switch (type.toUpperCase()) {
+        switch (type) {
             case "KHALTI":
-                return khaltiGateway.khaltiPay(amount);
+                return ((KhaltiGateway) gateway).khaltiPay(amount);
             case "ESEWA":
-                return eSewaGateway.eSewaPay(amount);
+                return ((ESewaGateway) gateway).eSewaPay(amount);
             case "PAYPAL":
-                double usdAmount = amount / 135.0;
-                return payPalGateway.paypalPay(usdAmount);
+                double usdAmount = amount / USD_TO_NPR_RATE;
+                return ((PayPalGateway) gateway).paypalPay(usdAmount);
             default:
                 return false;
         }
@@ -51,11 +50,11 @@ public class PaymentAdapter implements PaymentGateway {
 
     @Override
     public String getGatewayName() {
-        switch (type.toUpperCase()) {
-            case "KHALTI":  return khaltiGateway.getServiceName();
-            case "ESEWA":   return eSewaGateway.getServiceName();
-            case "PAYPAL":  return payPalGateway.getServiceName();
-            default:        return "Unknown";
-        }
+        return switch (type) {
+            case "KHALTI" -> ((KhaltiGateway) gateway).getServiceName();
+            case "ESEWA" -> ((ESewaGateway) gateway).getServiceName();
+            case "PAYPAL" -> ((PayPalGateway) gateway).getServiceName();
+            default -> "Unknown";
+        };
     }
 }

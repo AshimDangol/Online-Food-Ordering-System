@@ -6,6 +6,7 @@ import com.foodordering.state.PendingState;
 import com.foodordering.strategy.DeliveryStrategy;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -15,8 +16,8 @@ import java.util.List;
  * Built step-by-step via the Builder pattern.
  */
 public class Order {
-    private String orderId;
-    private Customer customer;
+    private final String orderId;
+    private final Customer customer;
     private List<OrderItem> items;
     private DeliveryStrategy deliveryStrategy;
     private String paymentMethod;
@@ -39,7 +40,7 @@ public class Order {
 
     public String getOrderId() { return orderId; }
     public Customer getCustomer() { return customer; }
-    public List<OrderItem> getItems() { return items; }
+    public List<OrderItem> getItems() { return Collections.unmodifiableList(items); }
     public DeliveryStrategy getDeliveryStrategy() { return deliveryStrategy; }
     public String getPaymentMethod() { return paymentMethod; }
     public double getTotalAmount() { return totalAmount; }

@@ -26,14 +26,15 @@ public class RestaurantConfig {
     }
 
     /**
-     * Returns the singleton instance, creating it lazily if needed.
+     * Returns the singleton instance (thread-safe via holder class idiom).
      * @return The shared RestaurantConfig instance
      */
     public static RestaurantConfig getInstance() {
-        if (instance == null) {
-            instance = new RestaurantConfig();
-        }
-        return instance;
+        return Holder.INSTANCE;
+    }
+
+    private static class Holder {
+        private static final RestaurantConfig INSTANCE = new RestaurantConfig();
     }
 
     public String getRestaurantName() { return restaurantName; }

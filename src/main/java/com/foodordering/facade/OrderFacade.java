@@ -7,6 +7,7 @@ import com.foodordering.model.*;
 import com.foodordering.observer.OrderObserver;
 import com.foodordering.proxy.AuthProxy;
 import com.foodordering.proxy.IOrderService;
+import com.foodordering.proxy.OrderService;
 import com.foodordering.strategy.DeliveryStrategy;
 
 import java.util.*;
@@ -19,14 +20,16 @@ import java.util.*;
  * needing to understand the underlying pattern interactions.
  */
 public class OrderFacade {
-    private IOrderService orderService;
-    private Map<String, Order> orders;
+    private final IOrderService orderService;
+    private final OrderService sharedOrderService;
+    private final Map<String, Order> orders;
 
     /**
      * @param currentUser The user performing operations (used for authorization)
      */
     public OrderFacade(User currentUser) {
-        this.orderService = new AuthProxy(currentUser);
+        this.sharedOrderService = new OrderService();
+        this.orderService = new AuthProxy(currentUser, sharedOrderService);
         this.orders = new HashMap<>();
     }
 
@@ -70,10 +73,12 @@ public class OrderFacade {
         return null;
     }
 
-    /** Cancels an order via the proxy for access control. */
+    /** Cancels an order via the shared proxy for access control. */
     public void cancelOrder(String orderId, User requester) {
-        IOrderService proxy = new AuthProxy(requester);
+        AuthProxy proxy = new AuthProxy(requester, sharedOrderService);
         proxy.cancelOrder(orderId);
+        // Also remove from local cache if it was there
+        orders.remove(orderId);
     }
 
     /** Returns the current status of an order. */
@@ -87,7 +92,7 @@ public class OrderFacade {
 
     /** Generates a report (admin-only via proxy). */
     public String generateReport(User requester) {
-        IOrderService proxy = new AuthProxy(requester);
+        AuthProxy proxy = new AuthProxy(requester, sharedOrderService);
         return proxy.generateReport("SUMMARY");
     }
 
