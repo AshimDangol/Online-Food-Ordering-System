@@ -1,6 +1,6 @@
-# FoodieExpress — Online Food Ordering System
+# Online Food Ordering System
 
-A comprehensive Java application demonstrating the integration of **11 Design Patterns** (Creational, Structural, and Behavioral) within a single real-world domain. Built as part of Assignment 2 — Design Patterns Integration Project.
+A comprehensive Java application demonstrating the integration of **11 Design Patterns** (Creational, Structural, and Behavioral) within a single real-world domain.
 
 ---
 
@@ -110,32 +110,6 @@ Or after compilation:
 ```bash
 java -cp target/classes com.foodordering.Main
 ```
-
----
-
-## Sample Output
-
-The demo produces professionally formatted console output, for example:
-
-```
-=========================================
-  SINGLETON PATTERN - RESTAURANT CONFIG
-=========================================
-Restaurant   : FoodieExpress
-Address      : 123 Food Street, Kathmandu
-Tax Rate     : 13.0%
-Delivery Fee : NPR 20.00 per km
-  (Same instance? true)
-
-=========================================
-  FACTORY METHOD PATTERN - USER CREATION
-=========================================
-User created: Alice Sharma [CUSTOMER] - alice@email.com
-User created: Bob Thapa [ADMIN] - bob@foodieexpress.com
-User created: Dev Rai [DELIVERY] - dev@email.com
-```
-
-Each pattern demonstration is clearly labeled with headers and separators for easy identification during viva.
 
 ---
 
