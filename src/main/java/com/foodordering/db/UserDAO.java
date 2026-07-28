@@ -6,11 +6,26 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Data access object for User persistence.
+ * Handles registration, authentication, and lookup of
+ * Customer, Admin, and DeliveryPartner entities in the H2 database.
+ */
 public class UserDAO {
+
+    /** @return A connection from the singleton DatabaseManager. */
     private Connection getConn() {
         return DatabaseManager.getInstance().getConnection();
     }
 
+    /**
+     * Inserts a new user into the database with the given password.
+     * Maps role-specific fields (phone, address, department, vehicle) based on User subclass.
+     *
+     * @param user     The User domain object (Customer, Admin, or DeliveryPartner)
+     * @param password The plaintext password to store
+     * @return true if registration succeeded
+     */
     public boolean registerUser(User user, String password) {
         String sql = "INSERT INTO users (id, name, email, password, role, phone, address, department, vehicle_number) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -49,6 +64,13 @@ public class UserDAO {
         }
     }
 
+    /**
+     * Authenticates a user by email and password.
+     *
+     * @param email    The user's email address
+     * @param password The user's password
+     * @return The matching User domain object, or null if authentication fails
+     */
     public User authenticate(String email, String password) {
         String sql = "SELECT * FROM users WHERE email = ? AND password = ?";
         try (PreparedStatement stmt = getConn().prepareStatement(sql)) {
@@ -64,6 +86,7 @@ public class UserDAO {
         return null;
     }
 
+    /** Finds a user by their unique ID. */
     public User findById(String id) {
         String sql = "SELECT * FROM users WHERE id = ?";
         try (PreparedStatement stmt = getConn().prepareStatement(sql)) {
@@ -78,6 +101,7 @@ public class UserDAO {
         return null;
     }
 
+    /** Finds a user by their email address. */
     public User findByEmail(String email) {
         String sql = "SELECT * FROM users WHERE email = ?";
         try (PreparedStatement stmt = getConn().prepareStatement(sql)) {
@@ -92,6 +116,7 @@ public class UserDAO {
         return null;
     }
 
+    /** Returns all users with the given role. */
     public List<User> findAllByRole(String role) {
         List<User> users = new ArrayList<>();
         String sql = "SELECT * FROM users WHERE role = ?";
@@ -107,6 +132,7 @@ public class UserDAO {
         return users;
     }
 
+    /** Returns all registered users. */
     public List<User> findAll() {
         List<User> users = new ArrayList<>();
         String sql = "SELECT * FROM users";
@@ -121,6 +147,11 @@ public class UserDAO {
         return users;
     }
 
+    /**
+     * Maps a database ResultSet row to the appropriate User subclass.
+     * Inspects the role column to determine whether to create
+     * a Customer, Admin, or DeliveryPartner instance.
+     */
     private User mapUser(ResultSet rs) throws SQLException {
         String id = rs.getString("id");
         String name = rs.getString("name");

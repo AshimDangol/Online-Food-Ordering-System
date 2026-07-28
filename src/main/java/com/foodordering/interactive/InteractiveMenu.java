@@ -18,6 +18,27 @@ import com.foodordering.strategy.*;
 
 import java.util.*;
 
+/**
+ * Main interactive console interface for the Online Food Ordering System.
+ * Provides role-based menus for Customers, Admins, and Delivery Partners.
+ * Each menu option demonstrates one or more GoF Design Patterns:
+ *
+ * <ul>
+ *   <li><b>Singleton</b> — RestaurantConfig and DatabaseManager</li>
+ *   <li><b>Factory Method</b> — User registration via UserFactory hierarchy</li>
+ *   <li><b>Builder</b> — Order construction via OrderBuilder</li>
+ *   <li><b>Decorator</b> — Item customization with cheese, toppings, drinks</li>
+ *   <li><b>Strategy</b> — Delivery charge calculation (Standard/Express/Scheduled)</li>
+ *   <li><b>Adapter</b> — Payment processing via Khalti/eSewa/PayPal</li>
+ *   <li><b>Facade</b> — OrderFacade simplifies the ordering workflow</li>
+ *   <li><b>Proxy</b> — AuthProxy controls report access</li>
+ *   <li><b>Observer</b> — Notifications on order status changes</li>
+ *   <li><b>Command</b> — Cancel orders with undo support</li>
+ *   <li><b>State</b> — Order lifecycle transitions</li>
+ * </ul>
+ *
+ * All data is persisted to an H2 embedded database via DAO objects.
+ */
 public class InteractiveMenu {
     private final Scanner scanner;
     private final InputHelper input;
@@ -29,6 +50,7 @@ public class InteractiveMenu {
     private User currentUser;
     private final CommandInvoker commandInvoker;
 
+    /** Initializes the interactive menu with DAOs and input helper. */
     public InteractiveMenu() {
         this.scanner = new Scanner(System.in);
         this.input = new InputHelper(scanner);
@@ -39,6 +61,11 @@ public class InteractiveMenu {
         this.commandInvoker = new CommandInvoker();
     }
 
+    /**
+     * Starts the main application loop.
+     * Displays the auth menu when no user is logged in,
+     * or the role-based main menu after authentication.
+     */
     public void start() {
         RestaurantConfig.getInstance();
 
@@ -52,6 +79,9 @@ public class InteractiveMenu {
         }
     }
 
+    // ==================== AUTHENTICATION ====================
+
+    /** Displays the login/register/exit menu. */
     private void showAuthMenu() {
         System.out.println("=========================================");
         System.out.println("  1. Login");
@@ -71,6 +101,7 @@ public class InteractiveMenu {
         }
     }
 
+    /** Authenticates the user via UserDAO and sets currentUser on success. */
     private void login() {
         System.out.println("\n=========================================");
         System.out.println("  LOGIN");
@@ -87,6 +118,12 @@ public class InteractiveMenu {
         input.pressEnter();
     }
 
+    /**
+     * Registers a new user using the Factory Method pattern.
+     * The user selects a role, and the corresponding concrete factory
+     * (CustomerFactory, AdminFactory, or DeliveryPartnerFactory)
+     * creates the appropriate User subclass.
+     */
     private void register() {
         System.out.println("\n=========================================");
         System.out.println("  REGISTER - FACTORY METHOD PATTERN");
@@ -146,6 +183,7 @@ public class InteractiveMenu {
         input.pressEnter();
     }
 
+    /** Routes to the appropriate role-based menu. */
     private void showMainMenu() {
         System.out.println("  Logged in as: " + currentUser.getName() + " [" + currentUser.getRole() + "]");
         switch (currentUser.getRole()) {
@@ -155,8 +193,9 @@ public class InteractiveMenu {
         }
     }
 
-    // ==================== CUSTOMER ====================
+    // ==================== CUSTOMER MENU ====================
 
+    /** Displays the customer menu loop with options for ordering, tracking, and account management. */
     private void showCustomerMenu() {
         while (true) {
             System.out.println("\n=========================================");
@@ -184,8 +223,9 @@ public class InteractiveMenu {
         }
     }
 
-    // ==================== ADMIN ====================
+    // ==================== ADMIN MENU ====================
 
+    /** Displays the admin menu loop with order processing, reporting, and menu management. */
     private void showAdminMenu() {
         while (true) {
             System.out.println("\n=========================================");
@@ -211,8 +251,9 @@ public class InteractiveMenu {
         }
     }
 
-    // ==================== DELIVERY ====================
+    // ==================== DELIVERY MENU ====================
 
+    /** Displays the delivery partner menu for managing out-for-delivery orders. */
     private void showDeliveryMenu() {
         while (true) {
             System.out.println("\n=========================================");
@@ -234,6 +275,7 @@ public class InteractiveMenu {
 
     // ==================== CUSTOMER FEATURES ====================
 
+    /** Displays available menu items loaded from the database. */
     private void browseMenu() {
         System.out.println("\n=========================================");
         System.out.println("  MENU ITEMS");
@@ -252,6 +294,11 @@ public class InteractiveMenu {
         input.pressEnter();
     }
 
+    /**
+     * Demonstrates the Decorator pattern by allowing the user to
+     * dynamically add extras (cheese, toppings, drinks) to a menu item.
+     * Each selection wraps the MenuItem in another decorator layer.
+     */
     private void customizeItemDemo() {
         System.out.println("\n=========================================");
         System.out.println("  DECORATOR PATTERN - ITEM CUSTOMIZATION");
@@ -319,6 +366,13 @@ public class InteractiveMenu {
         }
     }
 
+    /**
+     * Full order placement flow demonstrating Builder, Strategy, Adapter, and Facade patterns.
+     * 1. User selects menu items (optionally decorated)
+     * 2. User chooses a delivery strategy
+     * 3. User selects a payment gateway
+     * 4. OrderFacade orchestrates building, payment, and persistence
+     */
     private void placeOrder() {
         if (!(currentUser instanceof Customer customer)) {
             System.out.println("  Only customers can place orders.");
@@ -370,7 +424,6 @@ public class InteractiveMenu {
             return;
         }
 
-        // Strategy
         System.out.println("\n  --- STRATEGY PATTERN: DELIVERY ---");
         System.out.println("  1. Standard (NPR 20/km, 30-45 min)");
         System.out.println("  2. Express (NPR 20/km + 100, 15-20 min)");
@@ -386,7 +439,6 @@ public class InteractiveMenu {
         System.out.println("  [Strategy] " + strategy.getStrategyName() +
                 " | Charge: NPR " + String.format("%,.2f", strategy.calculateCharge(distance)));
 
-        // Payment
         System.out.println("\n  --- ADAPTER PATTERN: PAYMENT ---");
         System.out.println("  1. Khalti  2. eSewa  3. PayPal");
         int payChoice = input.readInt("  Choice: ");
@@ -399,10 +451,16 @@ public class InteractiveMenu {
         placeOrderWithItems(selectedItems, quantities, strategy, distance, paymentMethod);
     }
 
+    /** Convenience overload that defaults to Standard delivery and Khalti payment. */
     private void placeOrderWithItems(List<MenuItem> items, List<Integer> quantities) {
         placeOrderWithItems(items, quantities, new StandardDeliveryStrategy(), 3.0, "KHALTI");
     }
 
+    /**
+     * Core order placement logic. Uses the Facade pattern (OrderFacade) to
+     * orchestrate Builder construction, Adapter payment processing, and
+     * Proxy-based persistence. The order is then saved to the database.
+     */
     private void placeOrderWithItems(List<MenuItem> items, List<Integer> quantities,
                                       DeliveryStrategy strategy, double distance,
                                       String paymentMethod) {
@@ -433,6 +491,7 @@ public class InteractiveMenu {
         input.pressEnter();
     }
 
+    /** Interactive inline item customization using the Decorator pattern. */
     private MenuItem customizeItemInline(MenuItem item) {
         System.out.println("  [Decorator] Customize:");
         while (true) {
@@ -450,6 +509,11 @@ public class InteractiveMenu {
         }
     }
 
+    /**
+     * Displays the user's orders with their current lifecycle state.
+     * Demonstrates the State pattern by showing the order status
+     * and explaining the valid transition paths.
+     */
     private void trackOrders() {
         System.out.println("\n=========================================");
         System.out.println("  STATE PATTERN - TRACK ORDERS");
@@ -484,6 +548,11 @@ public class InteractiveMenu {
         input.pressEnter();
     }
 
+    /**
+     * Cancels an order using the Command pattern.
+     * The CancelOrderCommand is executed via the CommandInvoker,
+     * which maintains a history stack to support undo.
+     */
     private void cancelOrder() {
         System.out.println("\n=========================================");
         System.out.println("  COMMAND PATTERN - CANCEL ORDER");
@@ -524,6 +593,7 @@ public class InteractiveMenu {
         input.pressEnter();
     }
 
+    /** Displays notifications for the current user, logged by the Observer pattern. */
     private void viewNotifications() {
         System.out.println("\n=========================================");
         System.out.println("  OBSERVER PATTERN - NOTIFICATIONS");
@@ -534,6 +604,7 @@ public class InteractiveMenu {
 
     // ==================== ADMIN FEATURES ====================
 
+    /** Displays all orders in the system with their current status. */
     private void viewAllOrders() {
         System.out.println("\n=========================================");
         System.out.println("  ALL ORDERS");
@@ -553,6 +624,11 @@ public class InteractiveMenu {
         input.pressEnter();
     }
 
+    /**
+     * Allows an admin to advance an order through its State lifecycle.
+     * Each transition (confirm → prepare → deliver → complete) is checked
+     * by the current OrderState implementation for validity.
+     */
     private void processOrder() {
         System.out.println("\n=========================================");
         System.out.println("  STATE PATTERN - PROCESS ORDER");
@@ -598,6 +674,11 @@ public class InteractiveMenu {
         input.pressEnter();
     }
 
+    /**
+     * Generates an order report using the Proxy pattern for access control.
+     * AuthProxy checks whether the current user has the ADMIN role
+     * before delegating to the real OrderService.
+     */
     private void generateReport() {
         System.out.println("\n=========================================");
         System.out.println("  PROXY PATTERN - GENERATE REPORT");
@@ -622,6 +703,7 @@ public class InteractiveMenu {
         input.pressEnter();
     }
 
+    /** Admin menu management — view, add, or toggle availability of menu items. */
     private void manageMenu() {
         System.out.println("\n=========================================");
         System.out.println("  MANAGE MENU");
@@ -648,6 +730,7 @@ public class InteractiveMenu {
         input.pressEnter();
     }
 
+    /** Displays all notifications in the system. */
     private void viewAllNotifications() {
         System.out.println("\n=========================================");
         System.out.println("  NOTIFICATIONS (OBSERVER PATTERN)");
@@ -658,6 +741,7 @@ public class InteractiveMenu {
 
     // ==================== DELIVERY FEATURES ====================
 
+    /** Lists all orders that are currently out for delivery. */
     private void viewOutForDelivery() {
         System.out.println("\n=========================================");
         System.out.println("  OUT FOR DELIVERY");
@@ -669,6 +753,7 @@ public class InteractiveMenu {
         input.pressEnter();
     }
 
+    /** Marks an out-for-delivery order as delivered, triggering state transition and notification. */
     private void markDelivered() {
         System.out.println("\n=========================================");
         System.out.println("  MARK DELIVERED");
@@ -699,6 +784,7 @@ public class InteractiveMenu {
 
     // ==================== HELPERS ====================
 
+    /** Prints the application banner. */
     private void printBanner() {
         System.out.println();
         System.out.println("=========================================");

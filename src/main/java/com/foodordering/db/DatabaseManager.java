@@ -5,6 +5,11 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+/**
+ * Singleton pattern — Manages the H2 database connection and schema.
+ * Provides a single point of access to the embedded H2 database.
+ * Auto-creates tables and seeds initial menu data on first run.
+ */
 public class DatabaseManager {
     private static final String DB_URL = "jdbc:h2:./data/foodordering;DB_CLOSE_DELAY=-1";
     private static final String DB_USER = "sa";
@@ -13,6 +18,7 @@ public class DatabaseManager {
     private static DatabaseManager instance;
     private Connection connection;
 
+    /** Private constructor — initializes the connection and creates tables if needed. */
     private DatabaseManager() {
         try {
             connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
@@ -22,6 +28,7 @@ public class DatabaseManager {
         }
     }
 
+    /** Returns the singleton instance (thread-safe via synchronized). */
     public static synchronized DatabaseManager getInstance() {
         if (instance == null) {
             instance = new DatabaseManager();
@@ -29,6 +36,7 @@ public class DatabaseManager {
         return instance;
     }
 
+    /** Returns the active database connection, reconnecting if necessary. */
     public Connection getConnection() {
         try {
             if (connection == null || connection.isClosed()) {
@@ -40,6 +48,7 @@ public class DatabaseManager {
         return connection;
     }
 
+    /** Creates all required tables and seeds initial menu items. */
     private void createTables() {
         try (Statement stmt = connection.createStatement()) {
             stmt.execute("CREATE TABLE IF NOT EXISTS users (" +
@@ -102,13 +111,14 @@ public class DatabaseManager {
                         "(7, 'Chowmein', 200.0, TRUE), " +
                         "(8, 'Coke', 100.0, TRUE)");
             } catch (SQLException e) {
-                // ignore duplicate key on re-run
+                // Ignore duplicate key on re-run — menu items already seeded
             }
         } catch (SQLException e) {
             System.err.println("  [DB] Failed to create tables: " + e.getMessage());
         }
     }
 
+    /** Drops all tables and recreates them — useful for testing. */
     public void resetDatabase() {
         try (Statement stmt = connection.createStatement()) {
             stmt.execute("DROP ALL OBJECTS");
@@ -118,6 +128,7 @@ public class DatabaseManager {
         }
     }
 
+    /** Closes the database connection gracefully. */
     public void shutdown() {
         try {
             if (connection != null && !connection.isClosed()) {

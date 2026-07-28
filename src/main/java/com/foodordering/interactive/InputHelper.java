@@ -3,13 +3,20 @@ package com.foodordering.interactive;
 import java.util.InputMismatchException;
 import java.util.Scanner;
 
+/**
+ * Utility class for safe console input handling.
+ * Wraps a Scanner and provides typed read methods
+ * with built-in error recovery for invalid input.
+ */
 public class InputHelper {
     private final Scanner scanner;
 
+    /** Wraps the given Scanner for safe input operations. */
     public InputHelper(Scanner scanner) {
         this.scanner = scanner;
     }
 
+    /** Reads an integer from the console, retrying on invalid input. */
     public int readInt(String prompt) {
         while (true) {
             System.out.print(prompt);
@@ -24,6 +31,7 @@ public class InputHelper {
         }
     }
 
+    /** Reads a double from the console, retrying on invalid input. */
     public double readDouble(String prompt) {
         while (true) {
             System.out.print(prompt);
@@ -38,11 +46,13 @@ public class InputHelper {
         }
     }
 
+    /** Reads a trimmed line of text from the console. */
     public String readLine(String prompt) {
         System.out.print(prompt);
         return scanner.nextLine().trim();
     }
 
+    /** Reads a yes/no answer, retrying until valid input is provided. */
     public boolean readYesNo(String prompt) {
         while (true) {
             System.out.print(prompt + " (y/n): ");
@@ -53,6 +63,7 @@ public class InputHelper {
         }
     }
 
+    /** Pauses execution until the user presses Enter. */
     public void pressEnter() {
         System.out.print("  Press Enter to continue...");
         scanner.nextLine();
