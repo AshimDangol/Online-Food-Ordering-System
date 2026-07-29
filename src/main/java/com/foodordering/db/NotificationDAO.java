@@ -3,7 +3,7 @@ package com.foodordering.db;
 import java.sql.*;
 
 /**
- * Data access object for notification persistence.
+ * Data access object for notification persistence backed by PostgreSQL.
  * Logs observer pattern notifications to the database
  * and provides retrieval for user-facing notification views.
  */

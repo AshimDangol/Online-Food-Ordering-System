@@ -37,7 +37,7 @@ import java.util.*;
  *   <li><b>State</b> — Order lifecycle transitions</li>
  * </ul>
  *
- * All data is persisted to an H2 embedded database via DAO objects.
+ * All data is persisted to a PostgreSQL database via DAO objects.
  */
 public class InteractiveMenu {
     private final Scanner scanner;
@@ -790,7 +790,7 @@ public class InteractiveMenu {
         System.out.println("=========================================");
         System.out.println("  FOODIEEXPRESS - ONLINE FOOD ORDERING");
         System.out.println("  Interactive Console Application");
-        System.out.println("  11 Design Patterns | H2 Database");
+        System.out.println("  11 Design Patterns | PostgreSQL Database");
         System.out.println("=========================================");
     }
 }

@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Data access object for menu item persistence.
+ * Data access object for menu item persistence backed by PostgreSQL.
  * Provides CRUD operations on the menu_items table,
  * including availability toggling for admin management.
  */

@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * Data access object for User persistence.
  * Handles registration, authentication, and lookup of
- * Customer, Admin, and DeliveryPartner entities in the H2 database.
+ * Customer, Admin, and DeliveryPartner entities in the PostgreSQL database.
  */
 public class UserDAO {
 

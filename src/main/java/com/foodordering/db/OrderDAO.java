@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Data access object for Order persistence.
+ * Data access object for Order persistence backed by PostgreSQL.
  * Handles saving orders with their line items, updating status,
  * and retrieving order history by customer or for all users.
  * Uses the OrderState pattern to restore state on retrieval.
