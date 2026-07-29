@@ -1,0 +1,617 @@
+@startuml
+skinparam style strictuml
+skinparam backgroundcolor #FEFEFE
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam defaultFontSize 9
+skinparam classFontSize 9
+skinparam classAttributeFontSize 8
+skinparam pageMargin 10
+
+scale 0.7
+
+title "Online Food Ordering System\nDesign Patterns UML Class Diagram"
+
+' ============================================================
+' PACKAGES
+' ============================================================
+
+package "Model" as model {
+  abstract class User {
+    - id: String
+    - name: String
+    - email: String
+    - role: String
+    + User(id, name, email, role)
+    + getId(): String
+    + getName(): String
+    + getEmail(): String
+    + getRole(): String
+    + toString(): String
+  }
+
+  class Customer {
+    - phone: String
+    - address: String
+    + Customer(id, name, email, phone, address)
+    + getPhone(): String
+    + getAddress(): String
+    + setAddress(address): void
+  }
+
+  class Admin {
+    - department: String
+    + Admin(id, name, email, department)
+    + getDepartment(): String
+  }
+
+  class DeliveryPartner {
+    - vehicleNumber: String
+    - available: boolean
+    + DeliveryPartner(id, name, email, vehicleNumber)
+    + getVehicleNumber(): String
+    + isAvailable(): boolean
+    + setAvailable(boolean): void
+  }
+
+  interface MenuItem <<Decorator.Component>> {
+    + getDescription(): String
+    + getPrice(): double
+  }
+
+  class BaseMenuItem {
+    - name: String
+    - price: double
+    + BaseMenuItem(name, price)
+    + getDescription(): String
+    + getPrice(): double
+  }
+
+  class OrderItem {
+    - item: MenuItem
+    - quantity: int
+    + OrderItem(item, quantity)
+    + getItem(): MenuItem
+    + getQuantity(): int
+    + setQuantity(int): void
+    + getTotalPrice(): double
+    + getDescription(): String
+    + toString(): String
+  }
+
+  class Order {
+    - orderId: String
+    - customer: Customer
+    - items: List<OrderItem>
+    - deliveryStrategy: DeliveryStrategy
+    - paymentMethod: String
+    - totalAmount: double
+    - currentState: OrderState
+    - observers: List<OrderObserver>
+    + Order(orderId, customer)
+    + getOrderId(): String
+    + getCustomer(): Customer
+    + getItems(): List<OrderItem>
+    + getDeliveryStrategy(): DeliveryStrategy
+    + getPaymentMethod(): String
+    + getTotalAmount(): double
+    + getCurrentState(): OrderState
+    + getStatus(): String
+    + setItems(List<OrderItem>): void
+    + setDeliveryStrategy(DeliveryStrategy): void
+    + setPaymentMethod(String): void
+    + setTotalAmount(double): void
+    + setState(OrderState): void
+    + attach(OrderObserver): void
+    + detach(OrderObserver): void
+    + notifyObservers(String): void
+    + confirm(): void
+    + prepare(): void
+    + deliver(): void
+    + complete(): void
+    + cancel(): void
+    + addItem(OrderItem): void
+    + calculateTotal(): double
+    + toString(): String
+  }
+}
+
+package "Singleton" as singleton {
+  class RestaurantConfig {
+    - instance: RestaurantConfig
+    - restaurantName: String
+    - address: String
+    - phone: String
+    - operatingHours: String
+    - taxRate: double
+    - deliveryFeePerKm: double
+    - RestaurantConfig()
+    + getInstance(): RestaurantConfig
+    + getRestaurantName(): String
+    + getAddress(): String
+    + getPhone(): String
+    + getOperatingHours(): String
+    + getTaxRate(): double
+    + getDeliveryFeePerKm(): double
+    + display(): void
+  }
+  note right: Thread-safe via\nHolder class idiom
+}
+
+package "Factory Method" as factory {
+  abstract class UserFactory {
+    + createUser(id, name, email, extra): User
+    + createAndRegister(id, name, email, extra): User
+  }
+
+  class CustomerFactory {
+    + createUser(id, name, email, extra): User
+  }
+
+  class AdminFactory {
+    + createUser(id, name, email, extra): User
+  }
+
+  class DeliveryPartnerFactory {
+    + createUser(id, name, email, extra): User
+  }
+}
+
+package "Builder" as builder {
+  class OrderBuilder {
+    - order: Order
+    - deliveryCharge: double
+    - taxAmount: double
+    + OrderBuilder(Customer)
+    - generateOrderId(): String
+    + addItem(MenuItem, int): OrderBuilder
+    + setDeliveryStrategy(DeliveryStrategy, double): OrderBuilder
+    + setPaymentMethod(String): OrderBuilder
+    + addObserver(OrderObserver): OrderBuilder
+    + build(): Order
+    + getDeliveryCharge(): double
+    + getTaxAmount(): double
+  }
+}
+
+package "Adapter" as adapter {
+  interface PaymentGateway <<Adapter.Target>> {
+    + processPayment(double): boolean
+    + getGatewayName(): String
+  }
+
+  class PaymentAdapter {
+    - USD_TO_NPR_RATE: double
+    - type: String
+    - gateway: Object
+    + PaymentAdapter(String)
+    - initGateway(): void
+    + processPayment(double): boolean
+    + getGatewayName(): String
+  }
+
+  class KhaltiGateway {
+    + khaltiPay(double): boolean
+    + getServiceName(): String
+  }
+
+  class ESewaGateway {
+    + eSewaPay(double): boolean
+    + getServiceName(): String
+  }
+
+  class PayPalGateway {
+    + paypalPay(double): boolean
+    + getServiceName(): String
+  }
+}
+
+package "Facade" as facade {
+  class OrderFacade {
+    - orderService: IOrderService
+    - sharedOrderService: OrderService
+    - orders: Map<String, Order>
+    + OrderFacade(User)
+    + placeOrder(Customer, List<MenuItem>, List<Integer>, DeliveryStrategy, double, String, List<OrderObserver>): String
+    + cancelOrder(String, User): void
+    + trackOrder(String): String
+    + generateReport(User): String
+    + getOrder(String): Order
+  }
+}
+
+package "Proxy" as proxy {
+  interface IOrderService <<Proxy.Subject>> {
+    + placeOrder(Order): void
+    + cancelOrder(String): void
+    + generateReport(String): String
+  }
+
+  class OrderService {
+    - orderStore: Map<String, Order>
+    + OrderService()
+    + placeOrder(Order): void
+    + cancelOrder(String): void
+    + generateReport(String): String
+  }
+
+  class AuthProxy {
+    - realService: OrderService
+    - currentUser: User
+    + AuthProxy(User, OrderService)
+    + AuthProxy(User)
+    + placeOrder(Order): void
+    + cancelOrder(String): void
+    + generateReport(String): String
+  }
+}
+
+package "Decorator" as decorator {
+  abstract class ItemDecorator {
+    # item: MenuItem
+    + ItemDecorator(MenuItem)
+    + getDescription(): String
+    + getPrice(): double
+  }
+
+  class ExtraCheeseDecorator {
+    + ExtraCheeseDecorator(MenuItem)
+    + getDescription(): String
+    + getPrice(): double
+  }
+
+  class ExtraToppingDecorator {
+    + ExtraToppingDecorator(MenuItem)
+    + getDescription(): String
+    + getPrice(): double
+  }
+
+  class DrinkDecorator {
+    - drinkName: String
+    + DrinkDecorator(MenuItem, String)
+    + getDescription(): String
+    + getPrice(): double
+  }
+}
+
+package "Strategy" as strategy {
+  interface DeliveryStrategy <<Strategy.Strategy>> {
+    + getStrategyName(): String
+    + calculateCharge(double): double
+    + getEstimatedTime(): String
+  }
+
+  class StandardDeliveryStrategy {
+    + getStrategyName(): String
+    + calculateCharge(double): double
+    + getEstimatedTime(): String
+  }
+
+  class ExpressDeliveryStrategy {
+    + getStrategyName(): String
+    + calculateCharge(double): double
+    + getEstimatedTime(): String
+  }
+
+  class ScheduledDeliveryStrategy {
+    + getStrategyName(): String
+    + calculateCharge(double): double
+    + getEstimatedTime(): String
+  }
+}
+
+package "Observer" as observer {
+  interface OrderObserver <<Observer.Observer>> {
+    + update(Order, String): void
+  }
+
+  class CustomerNotifier {
+    + update(Order, String): void
+  }
+
+  class RestaurantNotifier {
+    + update(Order, String): void
+  }
+
+  class DeliveryNotifier {
+    + update(Order, String): void
+  }
+}
+
+package "Command" as command {
+  interface OrderCommand <<Command.Command>> {
+    + execute(): void
+    + undo(): void
+    + getDescription(): String
+  }
+
+  class PlaceOrderCommand {
+    - facade: OrderFacade
+    - customer: Customer
+    - items: List<MenuItem>
+    - quantities: List<Integer>
+    - strategy: DeliveryStrategy
+    - distanceKm: double
+    - paymentMethod: String
+    - observers: List<OrderObserver>
+    - orderId: String
+    + PlaceOrderCommand(...)
+    + execute(): void
+    + undo(): void
+    + getDescription(): String
+  }
+
+  class CancelOrderCommand {
+    - facade: OrderFacade
+    - orderId: String
+    - requester: User
+    + CancelOrderCommand(OrderFacade, String, User)
+    + execute(): void
+    + undo(): void
+    + getDescription(): String
+  }
+
+  class CommandInvoker {
+    - history: Stack<OrderCommand>
+    + CommandInvoker()
+    + executeCommand(OrderCommand): void
+    + undoLastCommand(): void
+    + getHistorySize(): int
+  }
+}
+
+package "State" as state {
+  interface OrderState <<State.State>> {
+    + confirm(Order): void
+    + prepare(Order): void
+    + deliver(Order): void
+    + complete(Order): void
+    + cancel(Order): void
+    + getStatus(): String
+  }
+
+  class PendingState {
+    + confirm(Order): void
+    + prepare(Order): void
+    + deliver(Order): void
+    + complete(Order): void
+    + cancel(Order): void
+    + getStatus(): String
+  }
+
+  class ConfirmedState {
+    + confirm(Order): void
+    + prepare(Order): void
+    + deliver(Order): void
+    + complete(Order): void
+    + cancel(Order): void
+    + getStatus(): String
+  }
+
+  class PreparingState {
+    + confirm(Order): void
+    + prepare(Order): void
+    + deliver(Order): void
+    + complete(Order): void
+    + cancel(Order): void
+    + getStatus(): String
+  }
+
+  class OutForDeliveryState {
+    + confirm(Order): void
+    + prepare(Order): void
+    + deliver(Order): void
+    + complete(Order): void
+    + cancel(Order): void
+    + getStatus(): String
+  }
+
+  class DeliveredState {
+    + confirm(Order): void
+    + prepare(Order): void
+    + deliver(Order): void
+    + complete(Order): void
+    + cancel(Order): void
+    + getStatus(): String
+  }
+
+  class CancelledState {
+    + confirm(Order): void
+    + prepare(Order): void
+    + deliver(Order): void
+    + complete(Order): void
+    + cancel(Order): void
+    + getStatus(): String
+  }
+}
+
+package "Report" as report {
+  class ReportGenerator {
+    + generateOrderReport(List<Order>): void
+  }
+}
+
+package "Database Layer" as db {
+  class DatabaseManager {
+    - instance: DatabaseManager
+    - connection: Connection
+    - DatabaseManager()
+    + getInstance(): DatabaseManager
+    + getConnection(): Connection
+    - createTables(): void
+    + resetDatabase(): void
+    + shutdown(): void
+  }
+  note right: <<Singleton>>\nPostgreSQL
+
+  class UserDAO {
+    + registerUser(User, String): boolean
+    + authenticate(String, String): User
+    + findById(String): User
+    + findByEmail(String): User
+    + findAllByRole(String): List<User>
+    + findAll(): List<User>
+  }
+
+  class MenuItemDAO {
+    + findAllAvailable(): List<MenuItem>
+    + findAll(): List<MenuItem>
+    + addItem(String, double): boolean
+    + toggleAvailability(String, boolean): boolean
+  }
+
+  class OrderDAO {
+    + saveOrder(Order): boolean
+    + updateStatus(String, String): boolean
+    + findByCustomerId(String): List<Order>
+    + findAll(): List<Order>
+  }
+
+  class NotificationDAO {
+    + saveNotification(String, String, String): void
+    + printNotificationsForUser(String): void
+  }
+}
+
+package "Interactive Layer" as interactive {
+  class InteractiveMenu {
+    - scanner: Scanner
+    - input: InputHelper
+    - userDAO: UserDAO
+    - menuItemDAO: MenuItemDAO
+    - orderDAO: OrderDAO
+    - notificationDAO: NotificationDAO
+    - currentUser: User
+    - commandInvoker: CommandInvoker
+    + InteractiveMenu()
+    + start(): void
+    - login(): void
+    - register(): void
+    - placeOrder(): void
+    - cancelOrder(): void
+    - trackOrders(): void
+    - generateReport(): void
+    - processOrder(): void
+    - customizeItemDemo(): void
+  }
+
+  class InputHelper {
+    - scanner: Scanner
+    + InputHelper(Scanner)
+    + readInt(String): int
+    + readDouble(String): double
+    + readLine(String): String
+    + readYesNo(String): boolean
+    + pressEnter(): void
+  }
+}
+
+' ============================================================
+' RELATIONSHIPS
+' ============================================================
+
+' -- Inheritance --
+Customer -up-|> User
+Admin -up-|> User
+DeliveryPartner -up-|> User
+
+BaseMenuItem -up-|> MenuItem
+ItemDecorator -up-|> MenuItem
+
+ExtraCheeseDecorator -up-|> ItemDecorator
+ExtraToppingDecorator -up-|> ItemDecorator
+DrinkDecorator -up-|> ItemDecorator
+
+CustomerFactory -up-|> UserFactory
+AdminFactory -up-|> UserFactory
+DeliveryPartnerFactory -up-|> UserFactory
+
+PaymentAdapter -up-|> PaymentGateway
+
+AuthProxy -up-|> IOrderService
+OrderService -up-|> IOrderService
+
+StandardDeliveryStrategy -up-|> DeliveryStrategy
+ExpressDeliveryStrategy -up-|> DeliveryStrategy
+ScheduledDeliveryStrategy -up-|> DeliveryStrategy
+
+CustomerNotifier -up-|> OrderObserver
+RestaurantNotifier -up-|> OrderObserver
+DeliveryNotifier -up-|> OrderObserver
+
+PlaceOrderCommand -up-|> OrderCommand
+CancelOrderCommand -up-|> OrderCommand
+
+PendingState -up-|> OrderState
+ConfirmedState -up-|> OrderState
+PreparingState -up-|> OrderState
+OutForDeliveryState -up-|> OrderState
+DeliveredState -up-|> OrderState
+CancelledState -up-|> OrderState
+
+' -- Associations --
+OrderItem --> MenuItem : wraps
+Order "1" *--> "*" OrderItem : contains
+Order --> "1" Customer : placed by
+Order --> "1" DeliveryStrategy : uses
+Order --> "1" OrderState : current state
+Order --> "*" OrderObserver : notifies
+
+OrderBuilder --> Order : builds
+OrderBuilder --> RestaurantConfig : reads config
+
+OrderFacade --> OrderBuilder : uses
+OrderFacade --> PaymentAdapter : processes payment
+OrderFacade --> AuthProxy : delegates to
+OrderFacade --> OrderService : shared service
+
+AuthProxy --> OrderService : wraps
+AuthProxy --> User : authorizes
+
+PaymentAdapter --> KhaltiGateway : wraps
+PaymentAdapter --> ESewaGateway : wraps
+PaymentAdapter --> PayPalGateway : wraps
+
+CommandInvoker --> OrderCommand : executes
+
+InteractiveMenu --> ReportGenerator : uses
+
+' -- DB Layer relationships --
+DatabaseManager -up-|> RestaurantConfig : <<also Singleton>>
+UserDAO --> DatabaseManager : uses
+MenuItemDAO --> DatabaseManager : uses
+OrderDAO --> DatabaseManager : uses
+NotificationDAO --> DatabaseManager : uses
+
+' -- Interactive Layer relationships --
+InteractiveMenu --> UserDAO : interacts
+InteractiveMenu --> MenuItemDAO : interacts
+InteractiveMenu --> OrderDAO : interacts
+InteractiveMenu --> NotificationDAO : interacts
+InteractiveMenu --> InputHelper : uses
+InteractiveMenu --> CommandInvoker : uses
+InteractiveMenu --> OrderFacade : uses
+InteractiveMenu --> AuthProxy : uses
+InteractiveMenu --> ReportGenerator : uses
+InteractiveMenu --> "*" UserFactory : creates users
+
+' -- Factory Method creates --
+CustomerFactory ..> Customer : creates
+AdminFactory ..> Admin : creates
+DeliveryPartnerFactory ..> DeliveryPartner : creates
+
+' -- Pattern stereotypes --
+note top of RestaurantConfig : <<Singleton>>
+note top of UserFactory : <<Factory Method Creator>>
+note top of OrderBuilder : <<Builder>>
+note top of PaymentAdapter : <<Adapter>>
+note top of OrderFacade : <<Facade>>
+note top of AuthProxy : <<Proxy>>
+note top of ItemDecorator : <<Decorator>>
+note top of DeliveryStrategy : <<Strategy>>
+note top of OrderObserver : <<Observer>>
+note top of OrderCommand : <<Command>>
+note top of OrderState : <<State>>
+
+@enduml
