@@ -1,7 +1,5 @@
 package com.foodordering.interactive;
 
-import com.foodordering.adapter.PaymentAdapter;
-import com.foodordering.builder.OrderBuilder;
 import com.foodordering.command.*;
 import com.foodordering.config.RestaurantConfig;
 import com.foodordering.db.*;

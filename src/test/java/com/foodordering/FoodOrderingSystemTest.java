@@ -18,7 +18,6 @@ import com.foodordering.observer.*;
 import com.foodordering.proxy.AuthProxy;
 import com.foodordering.proxy.IOrderService;
 import com.foodordering.report.ReportGenerator;
-import com.foodordering.state.PendingState;
 import com.foodordering.strategy.*;
 
 import org.junit.jupiter.api.Test;

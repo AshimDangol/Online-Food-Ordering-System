@@ -1,6 +1,6 @@
 # Online Food Ordering System
 
-A comprehensive **interactive Java application** demonstrating the integration of **11 Design Patterns** (Creational, Structural, and Behavioral) with **H2 database persistence** within a single real-world domain.
+A comprehensive **interactive Java application** demonstrating the integration of **11 Design Patterns** (Creational, Structural, and Behavioral) with **PostgreSQL database persistence** within a single real-world domain.
 
 ---
 
@@ -8,7 +8,7 @@ A comprehensive **interactive Java application** demonstrating the integration o
 
 Customers browse menu items, customize them with extras, choose delivery options, place orders via various payment gateways, and receive real-time status notifications. Administrators manage orders and generate reports.
 
-The application features an **interactive console menu** with login/register, role-based access, and database persistence via **H2 embedded database**.
+The application features an **interactive console menu** with login/register, role-based access, and database persistence via **PostgreSQL**.
 
 ---
 
@@ -34,13 +34,13 @@ The application features an **interactive console menu** with login/register, ro
 
 | Requirement       | Implementation                            |
 |-------------------|-------------------------------------------|
-| User Management   | Factory Method + UserDAO (H2 persistence) |
+| User Management   | Factory Method + UserDAO (PostgreSQL persistence) |
 | Core Business     | Interactive order placement, customization, payment, delivery |
-| Notifications     | Observer pattern + NotificationDAO (H2 log) |
+| Notifications     | Observer pattern + NotificationDAO (PostgreSQL log) |
 | Reports           | ReportGenerator + Proxy-restricted admin reports |
-| Status Tracking   | State pattern + OrderDAO (H2 persistence) |
+| Status Tracking   | State pattern + OrderDAO (PostgreSQL persistence) |
 | Security          | Proxy pattern (login + role-based access) |
-| Data Persistence  | H2 embedded database (auto-created) |
+| Data Persistence  | PostgreSQL database (auto-created) |
 
 ---
 
@@ -51,7 +51,7 @@ src/main/java/com/foodordering/
 ├── Main.java                         # Interactive entry point
 ├── config/RestaurantConfig.java      # Singleton
 ├── db/                               # Database Layer
-│   ├── DatabaseManager.java          # H2 connection singleton
+│   ├── DatabaseManager.java          # PostgreSQL connection singleton
 │   ├── UserDAO.java                  # User CRUD
 │   ├── MenuItemDAO.java              # Menu CRUD
 │   ├── OrderDAO.java                 # Order CRUD
@@ -75,7 +75,7 @@ src/main/java/com/foodordering/
 src/test/java/com/foodordering/
 └── FoodOrderingSystemTest.java       # 17 JUnit tests
 
-data/                                 # H2 database (auto-created)
+data/                                 # PostgreSQL database (auto-created)
 docs/
 ├── uml-diagram.puml                  # PlantUML source
 └── uml-diagram.png                   # Rendered UML class diagram
@@ -105,7 +105,7 @@ All **17 tests** pass, covering every pattern, database operations, plus a full 
 mvn exec:java
 ```
 
-The H2 database is auto-created in the `data/` directory on first run.
+The PostgreSQL database `foodordering` is auto-created on `localhost:5432` on first run (requires a running PostgreSQL 18+ server). User: `postgres`, Password: `1234`.
 
 ---
 
@@ -128,8 +128,8 @@ The H2 database is auto-created in the `data/` directory on first run.
 | 13     | Proxy           | Access control for sensitive operations         | ✅     |
 | 14     | Report          | Generate order summary report                   | ✅     |
 | 15     | Integration     | Full system workflow                            | ✅     |
-| 16     | Database        | User registration and authentication via H2     | ✅     |
-| 17     | Database        | Save and retrieve orders via H2                 | ✅     |
+| 16     | Database        | User registration and authentication via PostgreSQL | ✅ |
+| 17     | Database        | Save and retrieve orders via PostgreSQL             | ✅ |
 
 ---
 

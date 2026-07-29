@@ -1,7 +1,5 @@
 package com.foodordering.adapter;
 
-import com.foodordering.config.RestaurantConfig;
-
 /**
  * Adapter Pattern — Adapter.
  * Wraps incompatible payment gateway interfaces (Khalti, eSewa, PayPal)
