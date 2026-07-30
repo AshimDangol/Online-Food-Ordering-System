@@ -36,8 +36,8 @@ public class OrderDAO {
             stmt.setString(4, order.getDeliveryStrategy() != null ? order.getDeliveryStrategy().getStrategyName() : null);
             stmt.setString(5, order.getPaymentMethod());
             stmt.setDouble(6, order.calculateTotal());
-            stmt.setDouble(7, 0);
-            stmt.setDouble(8, 0);
+            stmt.setDouble(7, order.getTaxAmount());
+            stmt.setDouble(8, order.getDeliveryCharge());
             stmt.setDouble(9, order.getTotalAmount());
             stmt.setString(10, order.getStatus());
             stmt.executeUpdate();

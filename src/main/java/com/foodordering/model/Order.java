@@ -22,6 +22,8 @@ public class Order {
     private DeliveryStrategy deliveryStrategy;
     private String paymentMethod;
     private double totalAmount;
+    private double taxAmount;
+    private double deliveryCharge;
     private OrderState currentState;
     private List<OrderObserver> observers;
 
@@ -44,6 +46,8 @@ public class Order {
     public DeliveryStrategy getDeliveryStrategy() { return deliveryStrategy; }
     public String getPaymentMethod() { return paymentMethod; }
     public double getTotalAmount() { return totalAmount; }
+    public double getTaxAmount() { return taxAmount; }
+    public double getDeliveryCharge() { return deliveryCharge; }
     public OrderState getCurrentState() { return currentState; }
     public String getStatus() { return currentState.getStatus(); }
 
@@ -51,6 +55,8 @@ public class Order {
     public void setDeliveryStrategy(DeliveryStrategy s) { this.deliveryStrategy = s; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
     public void setTotalAmount(double totalAmount) { this.totalAmount = totalAmount; }
+    public void setTaxAmount(double taxAmount) { this.taxAmount = taxAmount; }
+    public void setDeliveryCharge(double deliveryCharge) { this.deliveryCharge = deliveryCharge; }
 
     /**
      * Changes the current state and notifies all observers.

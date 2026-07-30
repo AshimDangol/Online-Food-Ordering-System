@@ -75,7 +75,7 @@ src/main/java/com/foodordering/
 src/test/java/com/foodordering/
 └── FoodOrderingSystemTest.java       # 17 JUnit tests
 
-data/                                 # PostgreSQL database (auto-created)
+data/                                 # (reserved — not used with PostgreSQL)
 docs/
 ├── uml-diagram.puml                  # PlantUML source
 └── uml-diagram.png                   # Rendered UML class diagram

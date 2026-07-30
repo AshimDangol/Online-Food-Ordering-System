@@ -87,6 +87,8 @@ package "Model" as model {
     - deliveryStrategy: DeliveryStrategy
     - paymentMethod: String
     - totalAmount: double
+    - taxAmount: double
+    - deliveryCharge: double
     - currentState: OrderState
     - observers: List<OrderObserver>
     + Order(orderId, customer)
@@ -96,12 +98,16 @@ package "Model" as model {
     + getDeliveryStrategy(): DeliveryStrategy
     + getPaymentMethod(): String
     + getTotalAmount(): double
+    + getTaxAmount(): double
+    + getDeliveryCharge(): double
     + getCurrentState(): OrderState
     + getStatus(): String
     + setItems(List<OrderItem>): void
     + setDeliveryStrategy(DeliveryStrategy): void
     + setPaymentMethod(String): void
     + setTotalAmount(double): void
+    + setTaxAmount(double): void
+    + setDeliveryCharge(double): void
     + setState(OrderState): void
     + attach(OrderObserver): void
     + detach(OrderObserver): void

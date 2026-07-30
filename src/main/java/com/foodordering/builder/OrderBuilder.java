@@ -66,6 +66,8 @@ public class OrderBuilder {
         this.taxAmount = subtotal * taxRate;
         double total = subtotal + taxAmount + deliveryCharge;
         order.setTotalAmount(total);
+        order.setTaxAmount(this.taxAmount);
+        order.setDeliveryCharge(this.deliveryCharge);
         return order;
     }
 
