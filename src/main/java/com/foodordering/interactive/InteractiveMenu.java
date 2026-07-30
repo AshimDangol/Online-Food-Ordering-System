@@ -66,9 +66,10 @@ public class InteractiveMenu {
      */
     public void start() {
         RestaurantConfig.getInstance();
+        printBanner();
 
         while (true) {
-            printBanner();
+            System.out.println();
             if (currentUser == null) {
                 showAuthMenu();
             } else {
@@ -782,13 +783,12 @@ public class InteractiveMenu {
 
     // ==================== HELPERS ====================
 
-    /** Prints the application banner. */
+    /** Prints the application welcome banner once at startup. */
     private void printBanner() {
         System.out.println();
-        System.out.println("=========================================");
-        System.out.println("  FOODIEEXPRESS - ONLINE FOOD ORDERING");
-        System.out.println("  Interactive Console Application");
-        System.out.println("  11 Design Patterns | PostgreSQL Database");
-        System.out.println("=========================================");
+        System.out.println("╔═══════════════════════════════════════════╗");
+        System.out.println("║    FOODIEEXPRESS - ONLINE FOOD ORDERING   ║");
+        System.out.println("║    11 GoF Design Patterns | PostgreSQL   ║");
+        System.out.println("╚═══════════════════════════════════════════╝");
     }
 }
