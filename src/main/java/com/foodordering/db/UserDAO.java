@@ -33,8 +33,8 @@ public class UserDAO {
      * @return true if registration succeeded
      */
     public boolean registerUser(User user, String password) {
-        String sql = "INSERT INTO users (id, name, email, password, role, phone, address, department, vehicle_number) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO users (id, name, email, password, role, phone, address, department, vehicle_number, available) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement stmt = getConn().prepareStatement(sql)) {
             stmt.setString(1, user.getId());
             stmt.setString(2, user.getName());
@@ -46,21 +46,25 @@ public class UserDAO {
                 stmt.setString(7, c.getAddress());
                 stmt.setString(8, null);
                 stmt.setString(9, null);
+                stmt.setBoolean(10, true);
             } else if (user instanceof Admin a) {
                 stmt.setString(6, null);
                 stmt.setString(7, null);
                 stmt.setString(8, a.getDepartment());
                 stmt.setString(9, null);
+                stmt.setBoolean(10, true);
             } else if (user instanceof DeliveryPartner d) {
                 stmt.setString(6, null);
                 stmt.setString(7, null);
                 stmt.setString(8, null);
                 stmt.setString(9, d.getVehicleNumber());
+                stmt.setBoolean(10, d.isAvailable());
             } else {
                 stmt.setString(6, null);
                 stmt.setString(7, null);
                 stmt.setString(8, null);
                 stmt.setString(9, null);
+                stmt.setBoolean(10, true);
             }
             stmt.executeUpdate();
             return true;
@@ -97,32 +101,114 @@ public class UserDAO {
         return null;
     }
 
-    /** Hashes a password with a random salt: returns "salt:hexhash". */
+    private static final int HASH_ITERATIONS = 10_000;
+
+    /** Hashes a password with a random salt: returns "salt:iterations:hexhash". */
     private String hashPassword(String password) {
         String salt = Long.toHexString(new SecureRandom().nextLong());
-        return salt + ":" + sha256Hex(salt + password);
+        return salt + ":" + HASH_ITERATIONS + ":" + sha256HexIterated(salt + password, HASH_ITERATIONS);
     }
 
-    /** Verifies a plaintext password against a stored "salt:hexhash" (or legacy plaintext). */
+    /**
+     * Verifies a plaintext password against a stored hash. Supports the current
+     * "salt:iterations:hexhash" format, the older single-iteration "salt:hexhash"
+     * rows, and legacy plaintext rows created before hashing was introduced.
+     */
     private boolean matchesPassword(String password, String stored) {
         if (stored == null) return false;
-        int sep = stored.indexOf(':');
-        if (sep > 0) {
-            String salt = stored.substring(0, sep);
-            String expected = stored.substring(sep + 1);
-            return sha256Hex(salt + password).equalsIgnoreCase(expected);
+        String[] parts = stored.split(":");
+        if (parts.length == 3) {
+            int iterations;
+            try {
+                iterations = Integer.parseInt(parts[1]);
+            } catch (NumberFormatException e) {
+                iterations = 1;
+            }
+            return sha256HexIterated(parts[0] + password, iterations).equalsIgnoreCase(parts[2]);
+        }
+        if (parts.length == 2) {
+            return sha256HexIterated(parts[0] + password, 1).equalsIgnoreCase(parts[1]);
         }
         // Legacy row stored in plaintext before hashing was introduced
         return stored.equals(password);
     }
 
-    /** SHA-256 hex digest of the given string. */
-    private String sha256Hex(String input) {
+    /** Iterated SHA-256 hex digest of the given input. */
+    private String sha256HexIterated(String input, int iterations) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(md.digest(input.getBytes(StandardCharsets.UTF_8)));
+            byte[] digest = md.digest(input.getBytes(StandardCharsets.UTF_8));
+            for (int i = 1; i < iterations; i++) {
+                md.reset();
+                digest = md.digest(digest);
+            }
+            return HexFormat.of().formatHex(digest);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 unavailable", e);
+        }
+    }
+
+    /**
+     * Updates a user's profile fields (name, email, and role-specific details)
+     * in the database. The email column is UNIQUE, so duplicate emails fail.
+     *
+     * @param user The User domain object carrying the new values
+     * @return true if exactly one row was updated
+     */
+    public boolean updateProfile(User user) {
+        String sql = "UPDATE users SET name = ?, email = ?, phone = ?, address = ?, department = ?, vehicle_number = ?, available = ? WHERE id = ?";
+        try (PreparedStatement stmt = getConn().prepareStatement(sql)) {
+            stmt.setString(1, user.getName());
+            stmt.setString(2, user.getEmail());
+            if (user instanceof Customer c) {
+                stmt.setString(3, c.getPhone());
+                stmt.setString(4, c.getAddress());
+                stmt.setString(5, null);
+                stmt.setString(6, null);
+                stmt.setBoolean(7, true);
+            } else if (user instanceof Admin a) {
+                stmt.setString(3, null);
+                stmt.setString(4, null);
+                stmt.setString(5, a.getDepartment());
+                stmt.setString(6, null);
+                stmt.setBoolean(7, true);
+            } else if (user instanceof DeliveryPartner d) {
+                stmt.setString(3, null);
+                stmt.setString(4, null);
+                stmt.setString(5, null);
+                stmt.setString(6, d.getVehicleNumber());
+                stmt.setBoolean(7, d.isAvailable());
+            } else {
+                stmt.setString(3, null);
+                stmt.setString(4, null);
+                stmt.setString(5, null);
+                stmt.setString(6, null);
+                stmt.setBoolean(7, true);
+            }
+            stmt.setString(8, user.getId());
+            return stmt.executeUpdate() > 0;
+        } catch (Exception e) {
+            System.err.println("  [DB] Profile update error: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Changes a user's password by storing a fresh salted hash.
+     *
+     * @param userId      The unique user identifier
+     * @param newPassword The new plaintext password to hash and store
+     * @return true if exactly one row was updated
+     */
+    public boolean updatePassword(String userId, String newPassword) {
+        String sql = "UPDATE users SET password = ? WHERE id = ?";
+        try (PreparedStatement stmt = getConn().prepareStatement(sql)) {
+            stmt.setString(1, hashPassword(newPassword));
+            stmt.setString(2, userId);
+            return stmt.executeUpdate() > 0;
+        } catch (Exception e) {
+            System.err.println("  [DB] Password update error: " + e.getMessage());
+            return false;
         }
     }
 
@@ -139,6 +225,18 @@ public class UserDAO {
             System.err.println("  [DB] Find error: " + e.getMessage());
         }
         return null;
+    }
+
+    /** Deletes a user by ID (test cleanup; orders must be removed first). */
+    public boolean deleteUser(String id) {
+        String sql = "DELETE FROM users WHERE id = ?";
+        try (PreparedStatement stmt = getConn().prepareStatement(sql)) {
+            stmt.setString(1, id);
+            return stmt.executeUpdate() > 0;
+        } catch (Exception e) {
+            System.err.println("  [DB] Delete user error: " + e.getMessage());
+            return false;
+        }
     }
 
     /** Finds a user by their email address. */
@@ -206,8 +304,10 @@ public class UserDAO {
                 return new Admin(id, name, email,
                         rs.getString("department") != null ? rs.getString("department") : "General");
             case "DELIVERY":
-                return new DeliveryPartner(id, name, email,
+                DeliveryPartner partner = new DeliveryPartner(id, name, email,
                         rs.getString("vehicle_number") != null ? rs.getString("vehicle_number") : "N/A");
+                partner.setAvailable(rs.getBoolean("available"));
+                return partner;
             default:
                 return new Customer(id, name, email, "N/A", "N/A");
         }

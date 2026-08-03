@@ -12,10 +12,16 @@ import java.sql.Statement;
  * and seeds initial menu data on first run.
  */
 public class DatabaseManager {
-    private static final String DB_URL = "jdbc:postgresql://localhost:5432/foodordering";
-    private static final String ADMIN_DB_URL = "jdbc:postgresql://localhost:5432/postgres";
-    private static final String DB_USER = "postgres";
-    private static final String DB_PASS = "1234";
+    private static final String DB_URL = env("FOOD_DB_URL", "jdbc:postgresql://localhost:5432/foodordering");
+    private static final String ADMIN_DB_URL = env("FOOD_ADMIN_DB_URL", "jdbc:postgresql://localhost:5432/postgres");
+    private static final String DB_USER = env("FOOD_DB_USER", "postgres");
+    private static final String DB_PASS = env("FOOD_DB_PASS", "1234");
+
+    /** Reads an environment variable, falling back to the given default. */
+    private static String env(String key, String fallback) {
+        String value = System.getenv(key);
+        return value == null || value.isBlank() ? fallback : value;
+    }
 
     private static DatabaseManager instance;
     private Connection connection;

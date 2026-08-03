@@ -24,5 +24,6 @@ public class Customer extends User {
     public String getPhone() { return phone; }
     public String getAddress() { return address; }
 
+    public void setPhone(String phone) { this.phone = phone; }
     public void setAddress(String address) { this.address = address; }
 }

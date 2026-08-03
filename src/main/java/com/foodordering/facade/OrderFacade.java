@@ -74,18 +74,20 @@ public class OrderFacade {
     }
 
     /** Cancels an order via the shared proxy for access control. */
-    public void cancelOrder(String orderId, User requester) {
+    public boolean cancelOrder(String orderId, User requester) {
         AuthProxy proxy = new AuthProxy(requester, sharedOrderService);
-        proxy.cancelOrder(orderId);
+        boolean cancelled = proxy.cancelOrder(orderId);
         // Also remove from local cache if it was there
         orders.remove(orderId);
+        return cancelled;
     }
 
     /** Restores an order to a previous state (used by Command undo). */
-    public void restoreOrder(String orderId, String status, User requester) {
+    public boolean restoreOrder(String orderId, String status, User requester) {
         AuthProxy proxy = new AuthProxy(requester, sharedOrderService);
-        proxy.restoreOrder(orderId, status);
+        boolean restored = proxy.restoreOrder(orderId, status);
         orders.remove(orderId);
+        return restored;
     }
 
     /** Returns the current status of an order. */

@@ -23,17 +23,29 @@ public class CancelOrderCommand implements OrderCommand {
     }
 
     @Override
-    public void execute() {
-        facade.cancelOrder(orderId, requester);
-        System.out.println(ConsoleStyle.paint(ConsoleStyle.GREEN,
-                "  Result: Order " + orderId + " cancellation processed."));
+    public boolean execute() {
+        boolean cancelled = facade.cancelOrder(orderId, requester);
+        if (cancelled) {
+            System.out.println(ConsoleStyle.paint(ConsoleStyle.GREEN,
+                    "  Result: Order " + orderId + " cancellation processed."));
+        } else {
+            System.out.println(ConsoleStyle.paint(ConsoleStyle.RED,
+                    "  Result: Order " + orderId + " could not be cancelled \u2014 state machine rejected it."));
+        }
+        return cancelled;
     }
 
     @Override
-    public void undo() {
-        facade.restoreOrder(orderId, previousStatus, requester);
-        System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN,
-                "  Undo: Order " + orderId + " restored to " + previousStatus + "."));
+    public boolean undo() {
+        boolean restored = facade.restoreOrder(orderId, previousStatus, requester);
+        if (restored) {
+            System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN,
+                    "  Undo: Order " + orderId + " restored to " + previousStatus + "."));
+        } else {
+            System.out.println(ConsoleStyle.paint(ConsoleStyle.RED,
+                    "  Undo: Order " + orderId + " could not be restored."));
+        }
+        return restored;
     }
 
     @Override

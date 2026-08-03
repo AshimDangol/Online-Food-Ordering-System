@@ -39,18 +39,24 @@ public class PlaceOrderCommand implements OrderCommand {
     }
 
     @Override
-    public void execute() {
+    public boolean execute() {
         orderId = facade.placeOrder(customer, items, quantities, strategy, distanceKm,
                                     paymentMethod, observers);
-        System.out.println("  Result: Order placed successfully! ID: " + orderId);
+        if (orderId != null) {
+            System.out.println("  Result: Order placed successfully! ID: " + orderId);
+            return true;
+        }
+        System.out.println("  Result: Order placement failed.");
+        return false;
     }
 
     @Override
-    public void undo() {
+    public boolean undo() {
         if (orderId != null) {
             System.out.println("  Undo: Cancelling order " + orderId);
-            facade.cancelOrder(orderId, customer);
+            return facade.cancelOrder(orderId, customer);
         }
+        return false;
     }
 
     @Override

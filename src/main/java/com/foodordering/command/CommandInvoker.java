@@ -16,11 +16,15 @@ public class CommandInvoker {
         this.history = new Stack<>();
     }
 
-    /** Executes a command and adds it to the undo history. */
+    /** Executes a command and adds it to the undo history on success. */
     public void executeCommand(OrderCommand command) {
         System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, "  Executing: " + command.getDescription()));
-        command.execute();
-        history.push(command);
+        if (command.execute()) {
+            history.push(command);
+        } else {
+            System.out.println(ConsoleStyle.paint(ConsoleStyle.YELLOW,
+                    "  Command failed \u2014 not added to undo history."));
+        }
     }
 
     /** Undoes the most recently executed command. */

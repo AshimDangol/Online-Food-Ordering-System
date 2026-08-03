@@ -20,4 +20,6 @@ public class Admin extends User {
     }
 
     public String getDepartment() { return department; }
+
+    public void setDepartment(String department) { this.department = department; }
 }

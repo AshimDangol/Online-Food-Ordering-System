@@ -33,9 +33,10 @@ The system implements the following functional requirements:
 | FR7 | **Notifications** | Notify customers, kitchen, and delivery partners on status changes | Observer |
 | FR8 | **Order Operations** | Place and cancel orders with undo support for the last operation | Command |
 | FR9 | **Simplified Ordering** | Provide a single entry point for the complete ordering workflow | Facade |
-| FR10 | **Access Control** | Restrict report generation to ADMIN users; restrict cancellation to CUSTOMER/ADMIN | Proxy |
+| FR10 | **Access Control** | Restrict report generation to ADMIN users; restrict cancellation to CUSTOMER/ADMIN; restrict order placement to CUSTOMER/ADMIN | Proxy |
 | FR11 | **Configuration** | Single source of truth for restaurant-wide settings (tax rate, delivery fee, etc.) | Singleton |
-| FR12 | **Reporting** | Generate order summary reports with total, active, delivered, cancelled counts, and revenue | ReportGenerator |
+| FR12 | **Reporting** | Generate order summary reports with total, active, delivered, cancelled counts, and revenue (DB-backed) | ReportGenerator |
+| FR13 | **Profile Management** | Every user can view and edit their own profile: name, email, password, plus role-specific fields (phone/address, department, vehicle number, delivery availability) | UserDAO |
 
 ---
 
@@ -186,7 +187,7 @@ The `com.foodordering.db` package contains:
 - **`OrderDAO`** — Order persistence and status updates
 - **`NotificationDAO`** — Notification logging and retrieval
 
-The database is served by a local PostgreSQL instance. Connect via pgAdmin at `localhost:5432`, database `foodordering`, user `postgres`.
+The database is served by a local PostgreSQL instance. Connect via pgAdmin at `localhost:5432`, database `foodordering`, user `postgres`. Credentials and URLs can be overridden via the `FOOD_DB_URL`, `FOOD_DB_USER`, and `FOOD_DB_PASS` environment variables. Delivery partner availability is persisted in the `users.available` column and editable from the delivery partner's Settings menu.
 
 ## 8. UML Class Diagram
 
@@ -406,9 +407,9 @@ User created: Dev Rai [DELIVERY] - dev@email.com
 **Solution:** `AuthProxy` implements `IOrderService` and wraps a real `OrderService` instance. Before delegating, it checks the current user's role:
 - `generateReport()` — only ADMIN role is allowed
 - `cancelOrder()` — CUSTOMER and ADMIN roles are allowed
-- `placeOrder()` — all roles are allowed (logged for audit)
+- `placeOrder()` — CUSTOMER and ADMIN roles are allowed (DELIVERY role is denied)
 
-All operations are logged with user details for traceability.
+All operations are logged with user details for traceability. `OrderService` (the RealSubject) treats PostgreSQL as the single source of truth: cancellation, restoration, and reporting always operate on the freshest database copy, apply the state-machine guard first, and only persist a status change when the transition is legal — so invalid transitions (e.g. cancelling an out-for-delivery order) leave the database unchanged.
 
 **Applicable SOLID Principles:** Single Responsibility — access control logic is separated from business logic.
 
@@ -450,9 +451,9 @@ Observers can be attached/detached dynamically at runtime.
 
 **Solution:** The Command pattern encapsulates each operation as a separate class implementing `OrderCommand`:
 - `PlaceOrderCommand` — places an order via the Facade; undo cancels the order
-- `CancelOrderCommand` — cancels an order; undo is not supported (business rule)
+- `CancelOrderCommand` — cancels an order; undo restores it to its previous lifecycle state
 
-`CommandInvoker` maintains a `Stack<OrderCommand>` history. `executeCommand()` runs the command and pushes it onto the history stack; `undoLastCommand()` pops the most recent command and calls its `undo()` method.
+`CommandInvoker` maintains a `Stack<OrderCommand>` history. `executeCommand()` runs the command and pushes it onto the history stack only when it succeeds; `undoLastCommand()` pops the most recent command and calls its `undo()` method. Because each command reports whether it succeeded, a command rejected by the state machine is never recorded in the undo history.
 
 **Applicable SOLID Principles:** Single Responsibility — each command class handles one operation. Open/Closed — new commands can be added without changing the invoker.
 
@@ -487,7 +488,7 @@ Each state rejects invalid transitions with clear console messages, providing se
 
 ## 12. JUnit Test Results
 
-All 17 JUnit tests pass, covering every design pattern individually, database operations, plus a full integration workflow:
+All 19 JUnit tests pass, covering every design pattern individually, database operations, plus a full integration workflow (database tests are skipped automatically when PostgreSQL is not reachable):
 
 | Test | Pattern / Area | What It Verifies | Result |
 |---|---|---|---|
@@ -507,12 +508,14 @@ All 17 JUnit tests pass, covering every design pattern individually, database op
 | `testReportGenerator` | Report | Empty list does not throw | ✅ |
 | `testFullIntegration` | Integration | End-to-end: create user → build order → transition states → generate report | ✅ |
 | `testDatabaseUserAuth` | Database | User registration and authentication via PostgreSQL | ✅ |
-| `testDatabaseOrderPersistence` | Database | Save and retrieve orders via PostgreSQL | ✅ |
+| `testDatabaseOrderPersistence` | Database | Save and retrieve orders via PostgreSQL (quantity suffix not doubled, test rows cleaned up) | ✅ |
+| `testDatabaseProfileUpdate` | Database | Update profile (name/phone/address) and change password via PostgreSQL | ✅ |
+| `testCancelRejectedOutForDelivery` | Command/State | Out-for-delivery orders rejected by cancel, status unchanged | ✅ |
 
 **Test Command:** `mvn test`
 
 ```
-Tests run: 17, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 19, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
@@ -593,7 +596,7 @@ src/main/java/com/foodordering/
 └── report/ReportGenerator.java       # Report generation
 
 src/test/java/com/foodordering/
-└── FoodOrderingSystemTest.java       # 17 JUnit tests
+└── FoodOrderingSystemTest.java       # 19 JUnit tests
 
 data/                                 # (reserved — not used with PostgreSQL)
 docs/
@@ -638,7 +641,7 @@ This project successfully demonstrates the integration of **11 GoF Design Patter
 
 The patterns collaborate naturally — for example, `OrderFacade` (Facade) uses `OrderBuilder` (Builder) to construct an order, `PaymentAdapter` (Adapter) to process payment, and `AuthProxy` (Proxy) to persist with authorization. The `Order` object itself serves as both the State Context (delegating to `OrderState`) and the Observer Subject (notifying `OrderObserver` implementations).
 
-The system follows SOLID principles throughout, is fully tested with 15 JUnit tests, and produces clearly formatted console output identifying each pattern in use. The architecture is extensible — new user types, payment gateways, delivery strategies, item extras, order states, and commands can be added without modifying existing code.
+The system follows SOLID principles throughout, is fully tested with 19 JUnit tests, and produces clearly formatted console output identifying each pattern in use. The architecture is extensible — new user types, payment gateways, delivery strategies, item extras, order states, and commands can be added without modifying existing code.
 
 ---
 

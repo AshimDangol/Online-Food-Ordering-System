@@ -28,6 +28,8 @@ package "Model" as model {
     + getName(): String
     + getEmail(): String
     + getRole(): String
+    + setName(name): void
+    + setEmail(email): void
     + toString(): String
   }
 
@@ -37,6 +39,7 @@ package "Model" as model {
     + Customer(id, name, email, phone, address)
     + getPhone(): String
     + getAddress(): String
+    + setPhone(phone): void
     + setAddress(address): void
   }
 
@@ -44,6 +47,7 @@ package "Model" as model {
     - department: String
     + Admin(id, name, email, department)
     + getDepartment(): String
+    + setDepartment(department): void
   }
 
   class DeliveryPartner {
@@ -52,6 +56,7 @@ package "Model" as model {
     + DeliveryPartner(id, name, email, vehicleNumber)
     + getVehicleNumber(): String
     + isAvailable(): boolean
+    + setVehicleNumber(vehicleNumber): void
     + setAvailable(boolean): void
   }
 
@@ -242,8 +247,8 @@ package "Facade" as facade {
     - orders: Map<String, Order>
     + OrderFacade(User)
     + placeOrder(Customer, List<MenuItem>, List<Integer>, DeliveryStrategy, double, String, List<OrderObserver>): String
-    + cancelOrder(String, User): void
-    + restoreOrder(String, String, User): void
+    + cancelOrder(String, User): boolean
+    + restoreOrder(String, String, User): boolean
     + trackOrder(String): String
     + generateReport(User): String
     + getOrder(String): Order
@@ -253,16 +258,16 @@ package "Facade" as facade {
 package "Proxy" as proxy {
   interface IOrderService <<Proxy.Subject>> {
     + placeOrder(Order): void
-    + cancelOrder(String): void
-    + restoreOrder(String, String): void
+    + cancelOrder(String): boolean
+    + restoreOrder(String, String): boolean
     + generateReport(String): String
   }
 
   class OrderService {
     - {static} orderStore: Map<String, Order>
     + placeOrder(Order): void
-    + cancelOrder(String): void
-    + restoreOrder(String, String): void
+    + cancelOrder(String): boolean
+    + restoreOrder(String, String): boolean
     + generateReport(String): String
   }
 
@@ -272,8 +277,8 @@ package "Proxy" as proxy {
     + AuthProxy(User, OrderService)
     + AuthProxy(User)
     + placeOrder(Order): void
-    + cancelOrder(String): void
-    + restoreOrder(String, String): void
+    + cancelOrder(String): boolean
+    + restoreOrder(String, String): boolean
     + generateReport(String): String
   }
 }
@@ -352,8 +357,8 @@ package "Observer" as observer {
 
 package "Command" as command {
   interface OrderCommand <<Command.Command>> {
-    + execute(): void
-    + undo(): void
+    + execute(): boolean
+    + undo(): boolean
     + getDescription(): String
   }
 
@@ -368,8 +373,8 @@ package "Command" as command {
     - observers: List<OrderObserver>
     - orderId: String
     + PlaceOrderCommand(...)
-    + execute(): void
-    + undo(): void
+    + execute(): boolean
+    + undo(): boolean
     + getDescription(): String
   }
 
@@ -379,8 +384,8 @@ package "Command" as command {
     - requester: User
     - previousStatus: String
     + CancelOrderCommand(OrderFacade, String, User, String)
-    + execute(): void
-    + undo(): void
+    + execute(): boolean
+    + undo(): boolean
     + getDescription(): String
   }
 
@@ -481,6 +486,8 @@ package "Database Layer" as db {
   class UserDAO {
     + registerUser(User, String): boolean
     + authenticate(String, String): User
+    + updateProfile(User): boolean
+    + updatePassword(String, String): boolean
     + findById(String): User
     + findByEmail(String): User
     + findAllByRole(String): List<User>

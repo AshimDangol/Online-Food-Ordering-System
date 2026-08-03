@@ -77,7 +77,9 @@ public class OrderDAO {
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             for (OrderItem oi : order.getItems()) {
                 stmt.setString(1, order.getOrderId());
-                stmt.setString(2, oi.getDescription());
+                // Store the bare item description (no "x N" suffix) so reloading
+                // the order re-applies the quantity exactly once.
+                stmt.setString(2, oi.getItem().getDescription());
                 stmt.setDouble(3, oi.getItem().getPrice());
                 stmt.setInt(4, oi.getQuantity());
                 stmt.setDouble(5, oi.getTotalPrice());
@@ -95,6 +97,41 @@ public class OrderDAO {
             return stmt.executeUpdate() > 0;
         } catch (Exception e) {
             System.err.println("  [DB] Update status error: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /** Returns the single order with the given ID, or null if not found. */
+    public Order findByOrderId(String orderId) {
+        String sql = "SELECT * FROM orders WHERE id = ?";
+        try (PreparedStatement stmt = getConn().prepareStatement(sql)) {
+            stmt.setString(1, orderId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return mapOrderSummary(rs);
+            }
+        } catch (Exception e) {
+            System.err.println("  [DB] Find by id error: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /** Deletes an order with its line items and notifications (test cleanup). */
+    public boolean deleteOrder(String orderId) {
+        String[] deletes = {
+                "DELETE FROM order_items WHERE order_id = ?",
+                "DELETE FROM notifications WHERE order_id = ?",
+                "DELETE FROM orders WHERE id = ?"};
+        try {
+            for (String sql : deletes) {
+                try (PreparedStatement stmt = getConn().prepareStatement(sql)) {
+                    stmt.setString(1, orderId);
+                    stmt.executeUpdate();
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            System.err.println("  [DB] Delete order error: " + e.getMessage());
             return false;
         }
     }

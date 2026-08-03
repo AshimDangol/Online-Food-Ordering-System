@@ -30,6 +30,9 @@ public abstract class User {
     public String getEmail() { return email; }
     public String getRole() { return role; }
 
+    public void setName(String name) { this.name = name; }
+    public void setEmail(String email) { this.email = email; }
+
     @Override
     public String toString() {
         return String.format("%s [%s] - %s", name, role, email);

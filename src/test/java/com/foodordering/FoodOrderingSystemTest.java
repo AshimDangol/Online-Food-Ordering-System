@@ -17,6 +17,7 @@ import com.foodordering.model.DeliveryPartner;
 import com.foodordering.observer.*;
 import com.foodordering.proxy.AuthProxy;
 import com.foodordering.proxy.IOrderService;
+import com.foodordering.proxy.OrderService;
 import com.foodordering.report.ReportGenerator;
 import com.foodordering.strategy.*;
 
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * JUnit test cases verifying all 11 design pattern implementations
@@ -383,32 +385,38 @@ class FoodOrderingSystemTest {
     @org.junit.jupiter.api.Order(16)
     @DisplayName("Database - User registration and authentication")
     void testDatabaseUserAuth() {
-        com.foodordering.db.DatabaseManager.getInstance();
+        assumeTrue(com.foodordering.db.DatabaseManager.getInstance().getConnection() != null,
+                "PostgreSQL not available - skipping database test");
         String ts = String.valueOf(System.currentTimeMillis());
         String testId = "DB-AUTH-" + ts.substring(ts.length() - 6);
         String testEmail = "dbtest" + ts.substring(ts.length() - 6) + "@test.com";
 
-        UserFactory cf = new CustomerFactory();
-        Customer customer = (Customer) cf.createUser(testId, "DB User", testEmail,
-                "9800000000|Test Address");
+        try {
+            UserFactory cf = new CustomerFactory();
+            Customer customer = (Customer) cf.createUser(testId, "DB User", testEmail,
+                    "9800000000|Test Address");
 
-        com.foodordering.db.UserDAO userDAO = new com.foodordering.db.UserDAO();
-        boolean registered = userDAO.registerUser(customer, "password123");
-        assertTrue(registered, "User should be registered");
+            com.foodordering.db.UserDAO userDAO = new com.foodordering.db.UserDAO();
+            boolean registered = userDAO.registerUser(customer, "password123");
+            assertTrue(registered, "User should be registered");
 
-        User authenticated = userDAO.authenticate(testEmail, "password123");
-        assertNotNull(authenticated, "Should authenticate with correct password");
-        assertEquals("DB User", authenticated.getName());
+            User authenticated = userDAO.authenticate(testEmail, "password123");
+            assertNotNull(authenticated, "Should authenticate with correct password");
+            assertEquals("DB User", authenticated.getName());
 
-        User wrong = userDAO.authenticate(testEmail, "wrongpassword");
-        assertNull(wrong, "Should not authenticate with wrong password");
+            User wrong = userDAO.authenticate(testEmail, "wrongpassword");
+            assertNull(wrong, "Should not authenticate with wrong password");
+        } finally {
+            new com.foodordering.db.UserDAO().deleteUser(testId);
+        }
     }
 
     @Test
     @org.junit.jupiter.api.Order(17)
     @DisplayName("Database - Save and retrieve orders")
     void testDatabaseOrderPersistence() {
-        com.foodordering.db.DatabaseManager.getInstance();
+        assumeTrue(com.foodordering.db.DatabaseManager.getInstance().getConnection() != null,
+                "PostgreSQL not available - skipping database test");
         String ts = String.valueOf(System.currentTimeMillis());
         String custId = "DB-ORD-" + ts.substring(ts.length() - 6);
         String email = "ordertest" + ts.substring(ts.length() - 6) + "@test.com";
@@ -416,27 +424,95 @@ class FoodOrderingSystemTest {
         com.foodordering.db.UserDAO userDAO = new com.foodordering.db.UserDAO();
         com.foodordering.db.OrderDAO orderDAO = new com.foodordering.db.OrderDAO();
 
-        UserFactory cf = new CustomerFactory();
-        Customer cust = (Customer) cf.createUser(custId, "Order User", email,
-                "9800000000|Ktm");
-        userDAO.registerUser(cust, "pass");
+        Order order = null;
+        try {
+            UserFactory cf = new CustomerFactory();
+            Customer cust = (Customer) cf.createUser(custId, "Order User", email,
+                    "9800000000|Ktm");
+            userDAO.registerUser(cust, "pass");
 
-        Customer orderCustomer = (Customer) userDAO.findById(custId);
-        assertNotNull(orderCustomer);
+            Customer orderCustomer = (Customer) userDAO.findById(custId);
+            assertNotNull(orderCustomer);
 
-        MenuItem item = new BaseMenuItem("Test Item", 200.0);
-        OrderBuilder builder = new OrderBuilder(orderCustomer)
-                .addItem(item, 2)
-                .setDeliveryStrategy(new StandardDeliveryStrategy(), 5.0)
-                .setPaymentMethod("KHALTI");
-        Order order = builder.build();
+            MenuItem item = new BaseMenuItem("Test Item", 200.0);
+            OrderBuilder builder = new OrderBuilder(orderCustomer)
+                    .addItem(item, 2)
+                    .setDeliveryStrategy(new StandardDeliveryStrategy(), 5.0)
+                    .setPaymentMethod("KHALTI");
+            order = builder.build();
+            String savedOrderId = order.getOrderId();
 
-        boolean saved = orderDAO.saveOrder(order);
-        assertTrue(saved, "Order should be saved to database");
+            boolean saved = orderDAO.saveOrder(order);
+            assertTrue(saved, "Order should be saved to database");
 
-        List<Order> orders = orderDAO.findByCustomerId(custId);
-        assertFalse(orders.isEmpty(), "Should find saved orders");
-        assertTrue(orders.stream().anyMatch(o -> o.getOrderId().equals(order.getOrderId())),
-                "Saved order should be retrievable");
+            List<Order> orders = orderDAO.findByCustomerId(custId);
+            assertFalse(orders.isEmpty(), "Should find saved orders");
+            assertTrue(orders.stream().anyMatch(o -> o.getOrderId().equals(savedOrderId)),
+                    "Saved order should be retrievable");
+
+            Order reloaded = orderDAO.findByOrderId(savedOrderId);
+            assertNotNull(reloaded, "Order should be retrievable by ID");
+            assertEquals(1, reloaded.getItems().size(), "Reloaded order should keep its line items");
+            assertEquals("Test Item x 2", reloaded.getItems().get(0).getDescription(),
+                    "Quantity suffix must not be doubled on reload");
+        } finally {
+            if (order != null) orderDAO.deleteOrder(order.getOrderId());
+            userDAO.deleteUser(custId);
+        }
+    }
+
+    @Test
+    @org.junit.jupiter.api.Order(18)
+    @DisplayName("Database - Update profile and change password")
+    void testDatabaseProfileUpdate() {
+        assumeTrue(com.foodordering.db.DatabaseManager.getInstance().getConnection() != null,
+                "PostgreSQL not available - skipping database test");
+        String ts = String.valueOf(System.currentTimeMillis());
+        String id = "DB-PRF-" + ts.substring(ts.length() - 6);
+        String email = "prof" + ts.substring(ts.length() - 6) + "@test.com";
+
+        com.foodordering.db.UserDAO userDAO = new com.foodordering.db.UserDAO();
+        try {
+            UserFactory cf = new CustomerFactory();
+            Customer customer = (Customer) cf.createUser(id, "Profile User", email,
+                    "9800000000|Ktm");
+            assertTrue(userDAO.registerUser(customer, "oldpass"));
+
+            customer.setName("Updated Name");
+            customer.setPhone("9811111111");
+            customer.setAddress("New Address");
+            assertTrue(userDAO.updateProfile(customer), "Profile should be updated");
+
+            User fetched = userDAO.findById(id);
+            assertNotNull(fetched);
+            assertEquals("Updated Name", fetched.getName());
+            assertEquals("9811111111", ((Customer) fetched).getPhone());
+            assertEquals("New Address", ((Customer) fetched).getAddress());
+
+            assertTrue(userDAO.updatePassword(id, "newpass"), "Password should be updated");
+            assertNotNull(userDAO.authenticate(email, "newpass"), "New password should authenticate");
+            assertNull(userDAO.authenticate(email, "oldpass"), "Old password should no longer work");
+        } finally {
+            userDAO.deleteUser(id);
+        }
+    }
+
+    @Test
+    @org.junit.jupiter.api.Order(19)
+    @DisplayName("Command - Cancellation rejected for OUT_FOR_DELIVERY orders")
+    void testCancelRejectedOutForDelivery() {
+        Customer c = new Customer("U011", "Guard", "g@t.com", "9800000000", "Ktm");
+        Order order = new Order("ORD-GUARD-" + System.currentTimeMillis(), c);
+        OrderService svc = new OrderService();
+        svc.placeOrder(order);
+        order.confirm();
+        order.prepare();
+        order.deliver();
+        assertEquals("OUT_FOR_DELIVERY", order.getStatus());
+
+        assertFalse(svc.cancelOrder(order.getOrderId()),
+                "Out-for-delivery orders must be rejected by the state machine");
+        assertEquals("OUT_FOR_DELIVERY", order.getStatus(),
+                "Rejected cancellation must not change the status");
     }
 }

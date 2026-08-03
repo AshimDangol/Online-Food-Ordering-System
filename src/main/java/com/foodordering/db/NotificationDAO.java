@@ -34,6 +34,24 @@ public class NotificationDAO {
     }
 
     /**
+     * Re-points notifications from an old display name to a new one.
+     * Keeps a user's notification history visible after they change their name.
+     *
+     * @param oldName The previous name stored as recipient
+     * @param newName The new display name to store instead
+     */
+    public void renameRecipient(String oldName, String newName) {
+        String sql = "UPDATE notifications SET recipient = ? WHERE recipient = ?";
+        try (PreparedStatement stmt = getConn().prepareStatement(sql)) {
+            stmt.setString(1, newName);
+            stmt.setString(2, oldName);
+            stmt.executeUpdate();
+        } catch (Exception e) {
+            System.err.println("  [DB] Rename notification recipient error: " + e.getMessage());
+        }
+    }
+
+    /**
      * Prints all notifications for a given recipient to the console.
      * Uses SQL LIKE matching so "%" retrieves all notifications.
      *

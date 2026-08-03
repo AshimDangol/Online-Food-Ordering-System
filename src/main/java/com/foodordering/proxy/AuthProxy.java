@@ -31,33 +31,38 @@ public class AuthProxy implements IOrderService {
 
     @Override
     public void placeOrder(Order order) {
+        if (!"CUSTOMER".equals(currentUser.getRole()) && !"ADMIN".equals(currentUser.getRole())) {
+            System.out.println("  [AuthProxy] ACCESS DENIED: " + currentUser.getRole()
+                    + " cannot place orders.");
+            return;
+        }
         System.out.println("  [AuthProxy] Access granted to " + currentUser.getName()
                 + " (" + currentUser.getRole() + ") for placing order.");
         realService.placeOrder(order);
     }
 
     @Override
-    public void cancelOrder(String orderId) {
+    public boolean cancelOrder(String orderId) {
         if (!"CUSTOMER".equals(currentUser.getRole()) && !"ADMIN".equals(currentUser.getRole())) {
             System.out.println("  [AuthProxy] ACCESS DENIED: " + currentUser.getRole()
                     + " cannot cancel orders.");
-            return;
+            return false;
         }
         System.out.println("  [AuthProxy] Access granted to " + currentUser.getName()
                 + " (" + currentUser.getRole() + ") for cancellation.");
-        realService.cancelOrder(orderId);
+        return realService.cancelOrder(orderId);
     }
 
     @Override
-    public void restoreOrder(String orderId, String status) {
+    public boolean restoreOrder(String orderId, String status) {
         if (!"CUSTOMER".equals(currentUser.getRole()) && !"ADMIN".equals(currentUser.getRole())) {
             System.out.println("  [AuthProxy] ACCESS DENIED: " + currentUser.getRole()
                     + " cannot restore orders.");
-            return;
+            return false;
         }
         System.out.println("  [AuthProxy] Access granted to " + currentUser.getName()
                 + " (" + currentUser.getRole() + ") for order restoration.");
-        realService.restoreOrder(orderId, status);
+        return realService.restoreOrder(orderId, status);
     }
 
     @Override

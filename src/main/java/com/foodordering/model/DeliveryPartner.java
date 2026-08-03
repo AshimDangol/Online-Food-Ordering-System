@@ -23,5 +23,7 @@ public class DeliveryPartner extends User {
 
     public String getVehicleNumber() { return vehicleNumber; }
     public boolean isAvailable() { return available; }
+
+    public void setVehicleNumber(String vehicleNumber) { this.vehicleNumber = vehicleNumber; }
     public void setAvailable(boolean available) { this.available = available; }
 }

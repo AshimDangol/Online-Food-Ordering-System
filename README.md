@@ -35,12 +35,13 @@ The application features an **interactive console menu** with login/register, ro
 | Requirement       | Implementation                            |
 |-------------------|-------------------------------------------|
 | User Management   | Factory Method + UserDAO (PostgreSQL persistence) |
+| Profile Settings  | Settings menu for all roles: view/edit name, email, password, phone/address, department, vehicle number, delivery availability |
 | Core Business     | Interactive order placement, customization, payment, delivery |
 | Notifications     | Observer pattern + NotificationDAO (PostgreSQL log) |
-| Reports           | ReportGenerator + Proxy-restricted admin reports |
+| Reports           | ReportGenerator + Proxy-restricted admin reports (DB-backed) |
 | Status Tracking   | State pattern + OrderDAO (PostgreSQL persistence) |
-| Security          | Proxy pattern (login + role-based access) |
-| Data Persistence  | PostgreSQL database (auto-created) |
+| Security          | Proxy pattern (login + role-based access) + salted iterated password hashing + email/password validation |
+| Data Persistence  | PostgreSQL database (auto-created; credentials overridable via `FOOD_DB_URL`/`FOOD_DB_USER`/`FOOD_DB_PASS` env vars) |
 
 ---
 
@@ -73,7 +74,7 @@ src/main/java/com/foodordering/
 └── report/ReportGenerator.java       # Report generation
 
 src/test/java/com/foodordering/
-└── FoodOrderingSystemTest.java       # 17 JUnit tests
+└── FoodOrderingSystemTest.java       # 19 JUnit tests
 
 data/                                 # (reserved — not used with PostgreSQL)
 docs/
@@ -98,7 +99,7 @@ mvn clean compile
 ```bash
 mvn test
 ```
-All **17 tests** pass, covering every pattern, database operations, plus a full integration workflow.
+All **19 tests** pass, covering every pattern, database operations, plus a full integration workflow. Database tests are skipped automatically when PostgreSQL is unreachable.
 
 ### Run Interactive App
 ```bash
@@ -130,6 +131,8 @@ The PostgreSQL database `foodordering` is auto-created on `localhost:5432` on fi
 | 15     | Integration     | Full system workflow                            | ✅     |
 | 16     | Database        | User registration and authentication via PostgreSQL | ✅ |
 | 17     | Database        | Save and retrieve orders via PostgreSQL             | ✅ |
+| 18     | Database        | Update profile and change password via PostgreSQL   | ✅ |
+| 19     | Command         | Cancellation rejected for OUT_FOR_DELIVERY orders   | ✅ |
 
 ---
 
