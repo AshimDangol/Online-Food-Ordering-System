@@ -28,7 +28,7 @@ public class NotificationDAO {
             stmt.setString(2, recipient);
             stmt.setString(3, message);
             stmt.executeUpdate();
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("  [DB] Save notification error: " + e.getMessage());
         }
     }
@@ -52,7 +52,7 @@ public class NotificationDAO {
             if (!hasAny) {
                 System.out.println("  No notifications found.");
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("  [DB] Load notifications error: " + e.getMessage());
         }
     }

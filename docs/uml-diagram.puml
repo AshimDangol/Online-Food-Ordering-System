@@ -97,6 +97,7 @@ package "Model" as model {
     + getItems(): List<OrderItem>
     + getDeliveryStrategy(): DeliveryStrategy
     + getPaymentMethod(): String
+    + getSubtotal(): double
     + getTotalAmount(): double
     + getTaxAmount(): double
     + getDeliveryCharge(): double
@@ -105,6 +106,7 @@ package "Model" as model {
     + setItems(List<OrderItem>): void
     + setDeliveryStrategy(DeliveryStrategy): void
     + setPaymentMethod(String): void
+    + setSubtotal(double): void
     + setTotalAmount(double): void
     + setTaxAmount(double): void
     + setDeliveryCharge(double): void
@@ -188,11 +190,31 @@ package "Adapter" as adapter {
   }
 
   class PaymentAdapter {
-    - USD_TO_NPR_RATE: double
-    - type: String
-    - gateway: Object
+    - gateway: PaymentGateway
     + PaymentAdapter(String)
-    - initGateway(): void
+    - create(String): PaymentGateway
+    + processPayment(double): boolean
+    + getGatewayName(): String
+  }
+
+  class KhaltiAdapter {
+    - khalti: KhaltiGateway
+    + KhaltiAdapter(KhaltiGateway)
+    + processPayment(double): boolean
+    + getGatewayName(): String
+  }
+
+  class ESewaAdapter {
+    - esewa: ESewaGateway
+    + ESewaAdapter(ESewaGateway)
+    + processPayment(double): boolean
+    + getGatewayName(): String
+  }
+
+  class PayPalAdapter {
+    - USD_TO_NPR_RATE: double
+    - paypal: PayPalGateway
+    + PayPalAdapter(PayPalGateway)
     + processPayment(double): boolean
     + getGatewayName(): String
   }
@@ -221,6 +243,7 @@ package "Facade" as facade {
     + OrderFacade(User)
     + placeOrder(Customer, List<MenuItem>, List<Integer>, DeliveryStrategy, double, String, List<OrderObserver>): String
     + cancelOrder(String, User): void
+    + restoreOrder(String, String, User): void
     + trackOrder(String): String
     + generateReport(User): String
     + getOrder(String): Order
@@ -231,14 +254,15 @@ package "Proxy" as proxy {
   interface IOrderService <<Proxy.Subject>> {
     + placeOrder(Order): void
     + cancelOrder(String): void
+    + restoreOrder(String, String): void
     + generateReport(String): String
   }
 
   class OrderService {
-    - orderStore: Map<String, Order>
-    + OrderService()
+    - {static} orderStore: Map<String, Order>
     + placeOrder(Order): void
     + cancelOrder(String): void
+    + restoreOrder(String, String): void
     + generateReport(String): String
   }
 
@@ -249,6 +273,7 @@ package "Proxy" as proxy {
     + AuthProxy(User)
     + placeOrder(Order): void
     + cancelOrder(String): void
+    + restoreOrder(String, String): void
     + generateReport(String): String
   }
 }
@@ -352,7 +377,8 @@ package "Command" as command {
     - facade: OrderFacade
     - orderId: String
     - requester: User
-    + CancelOrderCommand(OrderFacade, String, User)
+    - previousStatus: String
+    + CancelOrderCommand(OrderFacade, String, User, String)
     + execute(): void
     + undo(): void
     + getDescription(): String
@@ -473,6 +499,7 @@ package "Database Layer" as db {
     + updateStatus(String, String): boolean
     + findByCustomerId(String): List<Order>
     + findAll(): List<Order>
+    + {static} fromStatus(String): OrderState
   }
 
   class NotificationDAO {
@@ -548,6 +575,9 @@ AdminFactory -up-|> UserFactory
 DeliveryPartnerFactory -up-|> UserFactory
 
 PaymentAdapter -up-|> PaymentGateway
+KhaltiAdapter -up-|> PaymentGateway
+ESewaAdapter -up-|> PaymentGateway
+PayPalAdapter -up-|> PaymentGateway
 
 AuthProxy -up-|> IOrderService
 OrderService -up-|> IOrderService
@@ -589,9 +619,12 @@ OrderFacade --> OrderService : shared service
 AuthProxy --> OrderService : wraps
 AuthProxy --> User : authorizes
 
-PaymentAdapter --> KhaltiGateway : wraps
-PaymentAdapter --> ESewaGateway : wraps
-PaymentAdapter --> PayPalGateway : wraps
+PaymentAdapter --> KhaltiAdapter : selects
+PaymentAdapter --> ESewaAdapter : selects
+PaymentAdapter --> PayPalAdapter : selects
+KhaltiAdapter --> KhaltiGateway : wraps
+ESewaAdapter --> ESewaGateway : wraps
+PayPalAdapter --> PayPalGateway : wraps
 
 CommandInvoker --> OrderCommand : executes
 

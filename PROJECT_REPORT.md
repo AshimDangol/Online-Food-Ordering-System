@@ -123,7 +123,7 @@ InteractiveMenu.placeOrder()
 | **Creational** | **Singleton** | `RestaurantConfig` | Ensures a single configuration instance for tax rate, delivery fee, restaurant info |
 | | **Factory Method** | `UserFactory`, `CustomerFactory`, `AdminFactory`, `DeliveryPartnerFactory` | Encapsulates user object creation; each factory produces a specific User subtype |
 | | **Builder** | `OrderBuilder` | Constructs complex Order objects step-by-step with fluent chaining |
-| **Structural** | **Adapter** | `PaymentGateway` (Target), `PaymentAdapter` (Adapter), `KhaltiGateway`/`ESewaGateway`/`PayPalGateway` (Adaptees) | Unifies three different payment gateway APIs behind a single interface |
+| **Structural** | **Adapter** | `PaymentGateway` (Target), `PaymentAdapter` (Adapter factory), `KhaltiAdapter`/`ESewaAdapter`/`PayPalAdapter` (Concrete Adapters), `KhaltiGateway`/`ESewaGateway`/`PayPalGateway` (Adaptees) | Unifies three different payment gateway APIs behind a single interface; PayPal adapter converts NPR to USD |
 | | **Facade** | `OrderFacade` | Provides a simplified interface to the ordering subsystem (builder + payment + proxy) |
 | | **Proxy** | `IOrderService` (Subject), `OrderService` (RealSubject), `AuthProxy` (Proxy) | Controls access to sensitive operations (cancel, report) based on user role |
 | | **Decorator** | `MenuItem` (Component), `BaseMenuItem` (ConcreteComponent), `ItemDecorator` (Decorator), `ExtraCheeseDecorator`/`ExtraToppingDecorator`/`DrinkDecorator` | Dynamically adds extras (cheese, toppings, drinks) to menu items |
@@ -206,7 +206,7 @@ The diagram is organized into packages by pattern category:
 
 ### Console Output — Demo Execution
 
-The application produces formatted console output clearly labeling each pattern demonstration:
+The application produces formatted console output clearly labeling each pattern demonstration. The interface uses a futuristic neon theme — cyan box borders, bold titles, and color-coded status badges (green DELIVERED, red CANCELLED, blue OUT FOR DELIVERY, etc.) — which automatically disables itself in terminals without ANSI color support:
 
 ```
 ╔══════════════════════════════════════════════════════════╗
@@ -386,10 +386,10 @@ User created: Dev Rai [DELIVERY] - dev@email.com
 
 ### 10.2 Structural Patterns
 
-#### Adapter — `PaymentAdapter` + Gateway classes
+#### Adapter — `PaymentAdapter` + per-gateway adapters
 **Problem:** The system must support multiple payment gateways (Khalti, eSewa, PayPal), each with its own proprietary API. Khalti uses `khaltiPay()`, eSewa uses `eSewaPay()`, and PayPal uses `paypalPay()` with USD amounts. Client code should not depend on gateway-specific interfaces.
 
-**Solution:** The Adapter pattern defines a unified `PaymentGateway` interface with `processPayment()` and `getGatewayName()`. `PaymentAdapter` implements this interface internally wrapping each gateway's native API. NPR-to-USD conversion is handled transparently for PayPal (rate: 135 NPR/USD).
+**Solution:** The Adapter pattern defines a unified `PaymentGateway` interface with `processPayment()` and `getGatewayName()`. `PaymentAdapter` acts as a client-facing factory that selects the appropriate concrete adapter — `KhaltiAdapter`, `ESewaAdapter`, or `PayPalAdapter` — each wrapping its gateway's native API. NPR-to-USD conversion is handled transparently inside `PayPalAdapter` (rate: 135 NPR/USD).
 
 **Applicable SOLID Principles:** Single Responsibility — each adapter class handles one gateway's API differences.
 
@@ -550,7 +550,10 @@ src/main/java/com/foodordering/
 ├── builder/OrderBuilder.java         # Builder
 ├── adapter/
 │   ├── PaymentGateway.java           # Target interface
-│   ├── PaymentAdapter.java           # Adapter
+│   ├── PaymentAdapter.java           # Adapter factory
+│   ├── KhaltiAdapter.java            # Concrete adapter
+│   ├── ESewaAdapter.java             # Concrete adapter
+│   ├── PayPalAdapter.java            # Concrete adapter (USD conversion)
 │   ├── KhaltiGateway.java            # Adaptee
 │   ├── ESewaGateway.java             # Adaptee
 │   └── PayPalGateway.java            # Adaptee

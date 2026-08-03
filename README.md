@@ -19,7 +19,7 @@ The application features an **interactive console menu** with login/register, ro
 | **Creational** | **Singleton**     | `RestaurantConfig` + `DatabaseManager` — single sources of config and DB      |
 |              | **Factory Method**| `UserFactory` hierarchy — creates `Customer`, `Admin`, `DeliveryPartner`      |
 |              | **Builder**       | `OrderBuilder` — step-by-step construction of complex `Order` objects         |
-| **Structural** | **Adapter**       | `PaymentAdapter` — unifies Khalti, eSewa, and PayPal behind one interface     |
+| **Structural** | **Adapter**       | `PaymentAdapter` selects `KhaltiAdapter`/`ESewaAdapter`/`PayPalAdapter` — each wraps one gateway (Khalti, eSewa, PayPal) behind one interface |
 |              | **Facade**        | `OrderFacade` — simplified interface to the ordering subsystem                |
 |              | **Proxy**         | `AuthProxy` — controls access to sensitive operations based on user role      |
 |              | **Decorator**     | `ItemDecorator` hierarchy — dynamically adds extras (cheese, toppings, drinks) |

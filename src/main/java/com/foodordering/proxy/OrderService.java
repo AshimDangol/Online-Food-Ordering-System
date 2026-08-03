@@ -8,14 +8,13 @@ import java.util.Map;
 /**
  * Proxy Pattern — RealSubject.
  * The actual order management logic that the proxy wraps.
- * Manages an in-memory store of orders and performs business operations.
+ * Manages the in-memory store of orders and performs business operations.
+ * The store is shared (static) so every facade and proxy created during
+ * the session sees the same orders — reports and cancellations therefore
+ * reflect orders placed earlier in the same run.
  */
 public class OrderService implements IOrderService {
-    private Map<String, Order> orderStore;
-
-    public OrderService() {
-        this.orderStore = new HashMap<>();
-    }
+    private static final Map<String, Order> orderStore = new HashMap<>();
 
     @Override
     public void placeOrder(Order order) {
@@ -30,7 +29,18 @@ public class OrderService implements IOrderService {
             order.cancel();
             System.out.println("  Order " + orderId + " cancelled in system.");
         } else {
-            System.out.println("  Order " + orderId + " not found.");
+            System.out.println("  Order " + orderId + " not found in system store.");
+        }
+    }
+
+    @Override
+    public void restoreOrder(String orderId, String status) {
+        Order order = orderStore.get(orderId);
+        if (order != null) {
+            order.setState(com.foodordering.db.OrderDAO.fromStatus(status));
+            System.out.println("  Order " + orderId + " restored to state: " + order.getStatus());
+        } else {
+            System.out.println("  Order " + orderId + " not found in system store.");
         }
     }
 

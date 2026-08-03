@@ -67,6 +67,12 @@ public class InteractiveMenu {
     public void start() {
         RestaurantConfig.getInstance();
         printBanner();
+        RestaurantConfig.getInstance().display();
+
+        if (DatabaseManager.getInstance().getConnection() == null) {
+            fail("  \u2717 Could not connect to the database. Exiting.");
+            return;
+        }
 
         while (true) {
             System.out.println();
@@ -82,37 +88,33 @@ public class InteractiveMenu {
 
     /** Displays the login/register/exit menu. */
     private void showAuthMenu() {
-        System.out.println("=========================================");
-        System.out.println("  1. Login");
-        System.out.println("  2. Register");
-        System.out.println("  3. Exit");
-        System.out.println("=========================================");
+        printMenuBox("\u2726", "WELCOME GUEST",
+                List.of("1. Login", "2. Register", "3. Exit"));
         int choice = input.readInt("  Choice: ");
         switch (choice) {
             case 1 -> login();
             case 2 -> register();
             case 3 -> {
-                System.out.println("\n  Thank you for using FoodieExpress!");
+                System.out.println("\n  " + ConsoleStyle.paint(ConsoleStyle.BRIGHT_CYAN,
+                        "Thank you for using FoodieExpress!"));
                 DatabaseManager.getInstance().shutdown();
                 System.exit(0);
             }
-            default -> System.out.println("  Invalid choice.");
+            default -> fail("  Invalid choice.");
         }
     }
 
     /** Authenticates the user via UserDAO and sets currentUser on success. */
     private void login() {
-        System.out.println("\n=========================================");
-        System.out.println("  LOGIN");
-        System.out.println("=========================================");
+        printHeader("LOGIN");
         String email = input.readLine("  Email: ");
         String password = input.readLine("  Password: ");
         User user = userDAO.authenticate(email, password);
         if (user != null) {
             currentUser = user;
-            System.out.println("  Welcome back, " + user.getName() + "! [" + user.getRole() + "]");
+            ok("  \u2713 Welcome back, " + user.getName() + "! [" + user.getRole() + "]");
         } else {
-            System.out.println("  Invalid email or password.");
+            fail("  \u2717 Invalid email or password.");
         }
         input.pressEnter();
     }
@@ -124,14 +126,13 @@ public class InteractiveMenu {
      * creates the appropriate User subclass.
      */
     private void register() {
-        System.out.println("\n=========================================");
-        System.out.println("  REGISTER - FACTORY METHOD PATTERN");
-        System.out.println("  (User creation via concrete factories)");
-        System.out.println("=========================================");
-        System.out.println("  1. Customer");
-        System.out.println("  2. Admin");
-        System.out.println("  3. Delivery Partner");
-        int roleChoice = input.readInt("  Select role: ");
+        printHeader("REGISTER");
+        printSubheader("Factory Method Pattern \u2014 User creation via concrete factories");
+        System.out.println("  Select user role:");
+        System.out.println("    1. Customer");
+        System.out.println("    2. Admin");
+        System.out.println("    3. Delivery Partner");
+        int roleChoice = input.readInt("  Role: ");
 
         String id = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         String name = input.readLine("  Name: ");
@@ -139,7 +140,7 @@ public class InteractiveMenu {
         String password = input.readLine("  Password: ");
 
         if (userDAO.findByEmail(email) != null) {
-            System.out.println("  Email already registered.");
+            fail("  Email already registered.");
             input.pressEnter();
             return;
         }
@@ -156,6 +157,11 @@ public class InteractiveMenu {
                 extra = phone + "|" + address;
             }
             case 2 -> {
+                if (!userDAO.findAllByRole("ADMIN").isEmpty()) {
+                    fail("  \u2717 Admin registration is locked \u2014 an admin account already exists.");
+                    input.pressEnter();
+                    return;
+                }
                 id = "A" + id;
                 factory = new AdminFactory();
                 extra = input.readLine("  Department: ");
@@ -166,25 +172,26 @@ public class InteractiveMenu {
                 extra = input.readLine("  Vehicle Number: ");
             }
             default -> {
-                System.out.println("  Invalid.");
+                fail("  Invalid.");
                 return;
             }
         }
 
-        System.out.println("  [Factory Method] Creating via " + factory.getClass().getSimpleName() + "...");
+        info("  [Factory Method] Creating via " + factory.getClass().getSimpleName() + "...");
         User newUser = factory.createAndRegister(id, name, email, extra);
 
         if (userDAO.registerUser(newUser, password)) {
-            System.out.println("  Registration successful! You can now log in.");
+            ok("  \u2713 Registration successful! You can now log in.");
         } else {
-            System.out.println("  Registration failed.");
+            fail("  \u2717 Registration failed.");
         }
         input.pressEnter();
     }
 
     /** Routes to the appropriate role-based menu. */
     private void showMainMenu() {
-        System.out.println("  Logged in as: " + currentUser.getName() + " [" + currentUser.getRole() + "]");
+        info("  Logged in: " + currentUser.getName() + " \u2502 " + currentUser.getRole());
+        printSeparator();
         switch (currentUser.getRole()) {
             case "ADMIN" -> showAdminMenu();
             case "DELIVERY" -> showDeliveryMenu();
@@ -197,16 +204,15 @@ public class InteractiveMenu {
     /** Displays the customer menu loop with options for ordering, tracking, and account management. */
     private void showCustomerMenu() {
         while (true) {
-            System.out.println("\n=========================================");
-            System.out.println("  CUSTOMER MENU");
-            System.out.println("=========================================");
-            System.out.println("  1. Browse Menu");
-            System.out.println("  2. Customize Item (Decorator Pattern)");
-            System.out.println("  3. Place New Order (Builder+Strategy+Adapter+Facade)");
-            System.out.println("  4. Track My Orders (State Pattern)");
-            System.out.println("  5. Cancel an Order (Command Pattern)");
-            System.out.println("  6. View Notifications (Observer Pattern)");
-            System.out.println("  7. Logout");
+            System.out.println();
+            printMenuBox("\u25BC", "CUSTOMER MENU",
+                    List.of("1. Browse Menu",
+                            "2. Customize Item [Decorator]",
+                            "3. Place Order [Build+Str+Adp+Fcd]",
+                            "4. Track Orders [State]",
+                            "5. Cancel Order [Command]",
+                            "6. Notifications [Observer]",
+                            "7. Logout"));
             int choice = input.readInt("  Choice: ");
 
             switch (choice) {
@@ -217,7 +223,7 @@ public class InteractiveMenu {
                 case 5 -> cancelOrder();
                 case 6 -> viewNotifications();
                 case 7 -> { currentUser = null; return; }
-                default -> System.out.println("  Invalid choice.");
+                default -> fail("  Invalid choice.");
             }
         }
     }
@@ -227,15 +233,14 @@ public class InteractiveMenu {
     /** Displays the admin menu loop with order processing, reporting, and menu management. */
     private void showAdminMenu() {
         while (true) {
-            System.out.println("\n=========================================");
-            System.out.println("  ADMIN MENU");
-            System.out.println("=========================================");
-            System.out.println("  1. View All Orders");
-            System.out.println("  2. Process Order (State Pattern)");
-            System.out.println("  3. Generate Report (Proxy Pattern)");
-            System.out.println("  4. Manage Menu Items");
-            System.out.println("  5. View All Notifications");
-            System.out.println("  6. Logout");
+            System.out.println();
+            printMenuBox("\u2699", "ADMIN MENU",
+                    List.of("1. View All Orders",
+                            "2. Process Order [State]",
+                            "3. Generate Report [Proxy]",
+                            "4. Manage Menu Items",
+                            "5. View All Notifications",
+                            "6. Logout"));
             int choice = input.readInt("  Choice: ");
 
             switch (choice) {
@@ -245,7 +250,7 @@ public class InteractiveMenu {
                 case 4 -> manageMenu();
                 case 5 -> viewAllNotifications();
                 case 6 -> { currentUser = null; return; }
-                default -> System.out.println("  Invalid choice.");
+                default -> fail("  Invalid choice.");
             }
         }
     }
@@ -255,19 +260,18 @@ public class InteractiveMenu {
     /** Displays the delivery partner menu for managing out-for-delivery orders. */
     private void showDeliveryMenu() {
         while (true) {
-            System.out.println("\n=========================================");
-            System.out.println("  DELIVERY PARTNER MENU");
-            System.out.println("=========================================");
-            System.out.println("  1. View Orders Out for Delivery");
-            System.out.println("  2. Mark Order as Delivered");
-            System.out.println("  3. Logout");
+            System.out.println();
+            printMenuBox("\u26A1", "DELIVERY PARTNER MENU",
+                    List.of("1. View Out for Delivery",
+                            "2. Mark as Delivered",
+                            "3. Logout"));
             int choice = input.readInt("  Choice: ");
 
             switch (choice) {
                 case 1 -> viewOutForDelivery();
                 case 2 -> markDelivered();
                 case 3 -> { currentUser = null; return; }
-                default -> System.out.println("  Invalid choice.");
+                default -> fail("  Invalid choice.");
             }
         }
     }
@@ -276,19 +280,23 @@ public class InteractiveMenu {
 
     /** Displays available menu items loaded from the database. */
     private void browseMenu() {
-        System.out.println("\n=========================================");
-        System.out.println("  MENU ITEMS");
-        System.out.println("=========================================");
+        printHeader("MENU ITEMS");
         List<MenuItem> items = menuItemDAO.findAllAvailable();
         if (items.isEmpty()) {
             System.out.println("  No items available.");
         } else {
-            System.out.printf("  %-3s %-25s %s%n", "#", "Item", "Price");
-            System.out.println("  " + "-".repeat(45));
+            printTableHeader(String.format("%-3s", "#"),
+                    String.format("%-27s", "Item"),
+                    String.format("%12s", "Price"));
             for (int i = 0; i < items.size(); i++) {
-                System.out.printf("  %-3d %-25s NPR %,.2f%n",
-                        i + 1, items.get(i).getDescription(), items.get(i).getPrice());
+                printTableRow(
+                        String.format("%-3d", i + 1),
+                        String.format("%-27s", items.get(i).getDescription()),
+                        String.format("%12s", fmt(items.get(i).getPrice())));
             }
+            printTableFooter(String.format("%-3s", "#"),
+                    String.format("%-27s", "Item"),
+                    String.format("%12s", "Price"));
         }
         input.pressEnter();
     }
@@ -299,9 +307,8 @@ public class InteractiveMenu {
      * Each selection wraps the MenuItem in another decorator layer.
      */
     private void customizeItemDemo() {
-        System.out.println("\n=========================================");
-        System.out.println("  DECORATOR PATTERN - ITEM CUSTOMIZATION");
-        System.out.println("=========================================");
+        printHeader("DECORATOR PATTERN");
+        printSubheader("Item Customization \u2014 Dynamically add extras to any menu item");
 
         List<MenuItem> available = menuItemDAO.findAllAvailable();
         if (available.isEmpty()) {
@@ -311,57 +318,67 @@ public class InteractiveMenu {
         }
 
         System.out.println("  Select a base item:");
+        printTableHeader(String.format("%-3s", "#"),
+                String.format("%-27s", "Item"),
+                String.format("%12s", "Price"));
         for (int i = 0; i < available.size(); i++) {
-            System.out.printf("  %d. %-25s NPR %,.2f%n", i + 1,
-                    available.get(i).getDescription(), available.get(i).getPrice());
+            printTableRow(
+                    String.format("%-3d", i + 1),
+                    String.format("%-27s", available.get(i).getDescription()),
+                    String.format("%12s", fmt(available.get(i).getPrice())));
         }
+        printTableFooter(String.format("%-3s", "#"),
+                String.format("%-27s", "Item"),
+                String.format("%12s", "Price"));
         int itemChoice = input.readInt("  Choice: ") - 1;
         if (itemChoice < 0 || itemChoice >= available.size()) {
-            System.out.println("  Invalid choice.");
+            fail("  Invalid choice.");
             input.pressEnter();
             return;
         }
 
         MenuItem customized = available.get(itemChoice);
-        System.out.println("\n  Starting with: " + customized.getDescription() +
-                " - NPR " + String.format("%,.2f", customized.getPrice()));
+        info("\n  \u25B6 Starting with: " + customized.getDescription() +
+                " \u2014 " + fmt(customized.getPrice()));
 
         while (true) {
-            System.out.println("\n  [Decorator] Add extras:");
-            System.out.println("  1. Extra Cheese (+NPR 50)");
-            System.out.println("  2. Extra Toppings (+NPR 80)");
-            System.out.println("  3. Add Drink (+NPR 100)");
-            System.out.println("  4. Done");
-            int choice = input.readInt("  Choice: ");
+            printSubheader("Add Extras [Decorator]");
+            System.out.println("    1. Extra Cheese    (+NPR 50)");
+            System.out.println("    2. Extra Toppings  (+NPR 80)");
+            System.out.println("    3. Add Drink       (+NPR 100)");
+            System.out.println("    4. Done");
+            int choice = input.readInt("    Choice: ");
 
             switch (choice) {
                 case 1 -> {
                     customized = new ExtraCheeseDecorator(customized);
-                    System.out.println("  + Extra Cheese");
+                    ok("    \u2714 + Extra Cheese");
                 }
                 case 2 -> {
                     customized = new ExtraToppingDecorator(customized);
-                    System.out.println("  + Extra Toppings");
+                    ok("    \u2714 + Extra Toppings");
                 }
                 case 3 -> {
-                    String drink = input.readLine("  Drink name: ");
+                    String drink = input.readLine("    Drink name: ");
                     customized = new DrinkDecorator(customized, drink);
-                    System.out.println("  + " + drink);
+                    ok("    \u2714 + " + drink);
                 }
                 case 4 -> {
-                    System.out.println("\n  FINAL CUSTOMIZED ITEM:");
-                    System.out.println("  " + customized.getDescription());
-                    System.out.println("  Price: NPR " + String.format("%,.2f", customized.getPrice()));
+                    printSeparator();
+                    System.out.println(ConsoleStyle.bold(ConsoleStyle.paint(ConsoleStyle.BRIGHT_YELLOW,
+                            "  \u2B50 FINAL CUSTOMIZED ITEM:")));
+                    System.out.println("    " + customized.getDescription());
+                    System.out.println("    Price: " + ConsoleStyle.paint(ConsoleStyle.BRIGHT_WHITE, fmt(customized.getPrice())));
 
                     if (input.readYesNo("\n  Add this to your order?")) {
                         placeOrderWithItems(List.of(customized), List.of(1));
                     }
                     return;
                 }
-                default -> System.out.println("  Invalid.");
+                default -> fail("    \u2717 Invalid.");
             }
-            System.out.println("  Current: " + customized.getDescription() +
-                    " - NPR " + String.format("%,.2f", customized.getPrice()));
+            info("    \u2192 Current: " + customized.getDescription() +
+                    " \u2014 " + fmt(customized.getPrice()));
         }
     }
 
@@ -379,10 +396,8 @@ public class InteractiveMenu {
             return;
         }
 
-        System.out.println("\n=========================================");
-        System.out.println("  PLACE ORDER");
-        System.out.println("  Patterns: Builder + Strategy + Adapter + Facade");
-        System.out.println("=========================================");
+        printHeader("PLACE ORDER");
+        printSubheader("Builder + Strategy + Adapter + Facade Patterns");
 
         List<MenuItem> selectedItems = new ArrayList<>();
         List<Integer> quantities = new ArrayList<>();
@@ -394,53 +409,75 @@ public class InteractiveMenu {
             return;
         }
 
+        // Step 1: Select items
+        info("\n  \u2460 Select items (0 to finish):");
+        printTableHeader(String.format("%-3s", "#"),
+                String.format("%-27s", "Item"),
+                String.format("%12s", "Price"));
+        for (int i = 0; i < menuItems.size(); i++) {
+            printTableRow(
+                    String.format("%-3d", i + 1),
+                    String.format("%-27s", menuItems.get(i).getDescription()),
+                    String.format("%12s", fmt(menuItems.get(i).getPrice())));
+        }
+        printTableFooter(String.format("%-3s", "#"),
+                String.format("%-27s", "Item"),
+                String.format("%12s", "Price"));
+
         while (true) {
-            System.out.println("\n  Select items (0 to finish):");
-            for (int i = 0; i < menuItems.size(); i++) {
-                System.out.printf("  %d. %-25s NPR %,.2f%n", i + 1,
-                        menuItems.get(i).getDescription(), menuItems.get(i).getPrice());
-            }
-            int sel = input.readInt("  Item: ");
+            int sel = input.readInt("  Item #: ");
             if (sel == 0) break;
             if (sel < 1 || sel > menuItems.size()) {
-                System.out.println("  Invalid.");
+                fail("  \u2717 Invalid.");
                 continue;
             }
 
             MenuItem item = menuItems.get(sel - 1);
-            if (input.readYesNo("  Customize with Decorator?")) {
+            if (input.readYesNo("  Customize with [Decorator]")) {
                 item = customizeItemInline(item);
             }
-            int qty = input.readInt("  Quantity: ");
+            int qty;
+            do {
+                qty = input.readInt("  Quantity: ");
+                if (qty < 1) fail("  \u2717 Quantity must be at least 1.");
+            } while (qty < 1);
             selectedItems.add(item);
             quantities.add(qty);
-            System.out.println("  Added: " + item.getDescription() + " x " + qty);
+            ok("  \u2714 Added: " + item.getDescription() + " x " + qty);
         }
 
         if (selectedItems.isEmpty()) {
-            System.out.println("  No items selected.");
+            fail("  \u2717 No items selected.");
             input.pressEnter();
             return;
         }
 
-        System.out.println("\n  --- STRATEGY PATTERN: DELIVERY ---");
-        System.out.println("  1. Standard (NPR 20/km, 30-45 min)");
-        System.out.println("  2. Express (NPR 20/km + 100, 15-20 min)");
-        System.out.println("  3. Scheduled (Free)");
-        int stratChoice = input.readInt("  Choice: ");
-        double distance = input.readDouble("  Distance (km): ");
+        // Step 2: Delivery strategy
+        printSeparator();
+        info("  \u2461 Delivery Options [Strategy Pattern]:");
+        System.out.println("    1. Standard  \u2014 NPR 20/km (30\u201345 min)");
+        System.out.println("    2. Express   \u2014 NPR 20/km + 100 (15\u201320 min)");
+        System.out.println("    3. Scheduled \u2014 Free");
+        int stratChoice = input.readInt("    Choice: ");
+        double distance;
+        do {
+            distance = input.readDouble("    Distance (km): ");
+            if (distance < 0) fail("    \u2717 Distance cannot be negative.");
+        } while (distance < 0);
 
         DeliveryStrategy strategy = switch (stratChoice) {
             case 2 -> new ExpressDeliveryStrategy();
             case 3 -> new ScheduledDeliveryStrategy();
             default -> new StandardDeliveryStrategy();
         };
-        System.out.println("  [Strategy] " + strategy.getStrategyName() +
-                " | Charge: NPR " + String.format("%,.2f", strategy.calculateCharge(distance)));
+        info("    \u2192 " + strategy.getStrategyName() +
+                " | Charge: " + fmt(strategy.calculateCharge(distance)));
 
-        System.out.println("\n  --- ADAPTER PATTERN: PAYMENT ---");
-        System.out.println("  1. Khalti  2. eSewa  3. PayPal");
-        int payChoice = input.readInt("  Choice: ");
+        // Step 3: Payment
+        printSeparator();
+        info("  \u2462 Payment Gateway [Adapter Pattern]:");
+        System.out.println("    1. Khalti    2. eSewa    3. PayPal");
+        int payChoice = input.readInt("    Choice: ");
         String paymentMethod = switch (payChoice) {
             case 2 -> "ESEWA";
             case 3 -> "PAYPAL";
@@ -465,11 +502,12 @@ public class InteractiveMenu {
                                       String paymentMethod) {
         if (!(currentUser instanceof Customer customer)) return;
 
-        System.out.println("\n  --- FACADE PATTERN: ORDER FACADE ---");
+        printSeparator();
+        info("  \u2463 Processing via Facade [Facade Pattern] ...");
         OrderFacade facade = new OrderFacade(currentUser);
 
         List<OrderObserver> observers = List.of(
-                new CustomerNotifier(), new RestaurantNotifier());
+                new CustomerNotifier(), new RestaurantNotifier(), new DeliveryNotifier());
 
         String orderId = facade.placeOrder(customer, items, quantities,
                 strategy, distance, paymentMethod, observers);
@@ -480,31 +518,38 @@ public class InteractiveMenu {
                 orderDAO.saveOrder(order);
                 notificationDAO.saveNotification(orderId, customer.getName(),
                         "Order " + orderId + " placed successfully.");
-                System.out.println("\n  Order saved to database!");
-                System.out.println("  Order ID: " + orderId);
-                System.out.println("  Total: NPR " + String.format("%,.2f", order.getTotalAmount()));
+                printSeparator();
+                System.out.println(ConsoleStyle.bold(ConsoleStyle.paint(ConsoleStyle.BRIGHT_YELLOW,
+                        "  \u2B50 ORDER CONFIRMED \u2B50")));
+                System.out.println("    Order ID : " + orderId);
+                System.out.println("    Customer : " + customer.getName());
+                System.out.println("    Items    : " + items.size() + " item(s)");
+                System.out.println("    Delivery : " + strategy.getStrategyName());
+                System.out.println("    Payment  : " + paymentMethod);
+                System.out.println("    Total    : " + ConsoleStyle.paint(ConsoleStyle.BRIGHT_YELLOW, fmt(order.getTotalAmount())));
+                printSeparator();
             }
         } else {
-            System.out.println("  Order placement failed.");
+            fail("  \u2717 Order placement failed.");
         }
         input.pressEnter();
     }
 
     /** Interactive inline item customization using the Decorator pattern. */
     private MenuItem customizeItemInline(MenuItem item) {
-        System.out.println("  [Decorator] Customize:");
+        printSubheader("Customize Item [Decorator Pattern]");
         while (true) {
-            System.out.println("    1. Extra Cheese (+50)  2. Extra Toppings (+80)  3. Add Drink (+100)  4. Done");
+            System.out.println("    1. Extra Cheese (+50)  2. Extra Toppings (+80)");
+            System.out.println("    3. Add Drink (+100)    4. Done");
             int c = input.readInt("    Choice: ");
             switch (c) {
-                case 1 -> item = new ExtraCheeseDecorator(item);
-                case 2 -> item = new ExtraToppingDecorator(item);
-                case 3 -> item = new DrinkDecorator(item, input.readLine("    Drink: "));
+                case 1 -> { item = new ExtraCheeseDecorator(item); ok("    \u2714 + Cheese"); }
+                case 2 -> { item = new ExtraToppingDecorator(item); ok("    \u2714 + Toppings"); }
+                case 3 -> { item = new DrinkDecorator(item, input.readLine("    Drink: ")); ok("    \u2714 + Drink"); }
                 case 4 -> { return item; }
-                default -> System.out.println("    Invalid.");
+                default -> fail("    \u2717 Invalid.");
             }
-            System.out.println("    Current: " + item.getDescription() +
-                    " - NPR " + String.format("%,.2f", item.getPrice()));
+            info("    \u2192 " + item.getDescription() + " \u2014 " + fmt(item.getPrice()));
         }
     }
 
@@ -514,48 +559,46 @@ public class InteractiveMenu {
      * and explaining the valid transition paths.
      */
     private void trackOrders() {
-        System.out.println("\n=========================================");
-        System.out.println("  STATE PATTERN - TRACK ORDERS");
-        System.out.println("=========================================");
+        printHeader("TRACK ORDERS");
+        printSubheader("State Pattern \u2014 Order Lifecycle Management");
 
         List<Order> orders = orderDAO.findByCustomerId(currentUser.getId());
         if (orders.isEmpty()) {
-            System.out.println("  No orders.");
+            System.out.println("  No orders found.");
             input.pressEnter();
             return;
         }
 
-        System.out.printf("  %-15s %-15s %-12s%n", "Order ID", "Status", "Amount");
-        System.out.println("  " + "-".repeat(45));
+        printTableHeader(String.format("%-15s", "Order ID"),
+                String.format("%-22s", "Status"),
+                String.format("%12s", "Amount"));
         for (Order o : orders) {
-            System.out.printf("  %-15s %-15s NPR %,.2f%n",
-                    o.getOrderId(), o.getStatus(), o.getTotalAmount());
+            printTableRow(
+                    String.format("%-15s", o.getOrderId()),
+                    badgeCell(o.getStatus()),
+                    String.format("%12s", fmt(o.getTotalAmount())));
         }
+        printTableFooter(String.format("%-15s", "Order ID"),
+                String.format("%-22s", "Status"),
+                String.format("%12s", "Amount"));
 
-        System.out.println("\n  [State Pattern] Order Lifecycle:");
-        System.out.println("  PENDING -> CONFIRMED -> PREPARING -> OUT_FOR_DELIVERY -> DELIVERED");
-        System.out.println("  Cancel allowed from: PENDING, CONFIRMED, PREPARING");
+        info("\n  \u25B6 Order Lifecycle: PENDING \u2192 CONFIRMED \u2192 PREPARING \u2192 OUT FOR DELIVERY \u2192 DELIVERED");
+        warn("  \u2716 Cancel allowed from: PENDING, CONFIRMED, PREPARING");
 
-        if (input.readYesNo("  View state transitions for an order?")) {
+        if (input.readYesNo("  View details for an order")) {
             String oid = input.readLine("  Order ID: ");
             orders.stream()
                     .filter(o -> o.getOrderId().equalsIgnoreCase(oid))
                     .findFirst().ifPresentOrElse(
-                            o -> System.out.println("  Current state: " + o.getStatus()),
-                            () -> System.out.println("  Not found."));
+                            o -> System.out.println("  Current state: " + ConsoleStyle.statusBadge(o.getStatus())),
+                            () -> fail("  \u2717 Not found."));
         }
         input.pressEnter();
     }
 
-    /**
-     * Cancels an order using the Command pattern.
-     * The CancelOrderCommand is executed via the CommandInvoker,
-     * which maintains a history stack to support undo.
-     */
     private void cancelOrder() {
-        System.out.println("\n=========================================");
-        System.out.println("  COMMAND PATTERN - CANCEL ORDER");
-        System.out.println("=========================================");
+        printHeader("CANCEL ORDER");
+        printSubheader("Command Pattern \u2014 Cancel with undo support");
 
         List<Order> orders = orderDAO.findByCustomerId(currentUser.getId());
         List<Order> cancellable = orders.stream()
@@ -568,16 +611,29 @@ public class InteractiveMenu {
             return;
         }
 
+        printTableHeader(String.format("%-3s", "#"),
+                String.format("%-15s", "Order ID"),
+                String.format("%-22s", "Status"),
+                String.format("%12s", "Amount"));
         for (int i = 0; i < cancellable.size(); i++) {
-            System.out.printf("  %d. %s - %s%n", i + 1,
-                    cancellable.get(i).getOrderId(), cancellable.get(i).getStatus());
+            Order o = cancellable.get(i);
+            printTableRow(
+                    String.format("%-3d", i + 1),
+                    String.format("%-15s", o.getOrderId()),
+                    badgeCell(o.getStatus()),
+                    String.format("%12s", fmt(o.getTotalAmount())));
         }
+        printTableFooter(String.format("%-3s", "#"),
+                String.format("%-15s", "Order ID"),
+                String.format("%-22s", "Status"),
+                String.format("%12s", "Amount"));
         int choice = input.readInt("  Select: ") - 1;
         if (choice < 0 || choice >= cancellable.size()) return;
 
         Order toCancel = cancellable.get(choice);
+        String previousStatus = toCancel.getStatus();
         CancelOrderCommand cmd = new CancelOrderCommand(
-                new OrderFacade(currentUser), toCancel.getOrderId(), currentUser);
+                new OrderFacade(currentUser), toCancel.getOrderId(), currentUser, previousStatus);
         commandInvoker.executeCommand(cmd);
 
         toCancel.cancel();
@@ -585,53 +641,55 @@ public class InteractiveMenu {
         notificationDAO.saveNotification(toCancel.getOrderId(), currentUser.getName(),
                 "Order " + toCancel.getOrderId() + " cancelled.");
 
-        System.out.println("  [Command] History size: " + commandInvoker.getHistorySize());
-        if (input.readYesNo("  Undo? (Command Undo)")) {
+        info("  \u25B6 [Command] executed. History size: " + commandInvoker.getHistorySize());
+        if (input.readYesNo("  Undo? [Command Undo]")) {
             commandInvoker.undoLastCommand();
+            toCancel.setState(OrderDAO.fromStatus(previousStatus));
+            orderDAO.updateStatus(toCancel.getOrderId(), previousStatus);
+            notificationDAO.saveNotification(toCancel.getOrderId(), currentUser.getName(),
+                    "Order " + toCancel.getOrderId() + " restored to " + previousStatus + ".");
         }
         input.pressEnter();
     }
 
-    /** Displays notifications for the current user, logged by the Observer pattern. */
     private void viewNotifications() {
-        System.out.println("\n=========================================");
-        System.out.println("  OBSERVER PATTERN - NOTIFICATIONS");
-        System.out.println("=========================================");
+        printHeader("NOTIFICATIONS");
+        printSubheader("Observer Pattern \u2014 Event-driven notifications");
         notificationDAO.printNotificationsForUser(currentUser.getName());
         input.pressEnter();
     }
 
     // ==================== ADMIN FEATURES ====================
 
-    /** Displays all orders in the system with their current status. */
     private void viewAllOrders() {
-        System.out.println("\n=========================================");
-        System.out.println("  ALL ORDERS");
-        System.out.println("=========================================");
+        printHeader("ALL ORDERS");
         List<Order> orders = orderDAO.findAll();
         if (orders.isEmpty()) {
             System.out.println("  No orders.");
             input.pressEnter();
             return;
         }
-        System.out.printf("  %-15s %-20s %-15s %-12s%n", "Order ID", "Customer", "Status", "Amount");
-        System.out.println("  " + "-".repeat(65));
+        printTableHeader(String.format("%-15s", "Order ID"),
+                String.format("%-20s", "Customer"),
+                String.format("%-22s", "Status"),
+                String.format("%12s", "Amount"));
         for (Order o : orders) {
-            System.out.printf("  %-15s %-20s %-15s NPR %,.2f%n",
-                    o.getOrderId(), o.getCustomer().getName(), o.getStatus(), o.getTotalAmount());
+            printTableRow(
+                    String.format("%-15s", o.getOrderId()),
+                    String.format("%-20s", o.getCustomer().getName()),
+                    badgeCell(o.getStatus()),
+                    String.format("%12s", fmt(o.getTotalAmount())));
         }
+        printTableFooter(String.format("%-15s", "Order ID"),
+                String.format("%-20s", "Customer"),
+                String.format("%-22s", "Status"),
+                String.format("%12s", "Amount"));
         input.pressEnter();
     }
 
-    /**
-     * Allows an admin to advance an order through its State lifecycle.
-     * Each transition (confirm → prepare → deliver → complete) is checked
-     * by the current OrderState implementation for validity.
-     */
     private void processOrder() {
-        System.out.println("\n=========================================");
-        System.out.println("  STATE PATTERN - PROCESS ORDER");
-        System.out.println("=========================================");
+        printHeader("PROCESS ORDER");
+        printSubheader("State Pattern \u2014 Advance order through lifecycle");
 
         List<Order> orders = orderDAO.findAll().stream()
                 .filter(o -> !o.getStatus().equals("DELIVERED") && !o.getStatus().equals("CANCELLED"))
@@ -643,56 +701,72 @@ public class InteractiveMenu {
             return;
         }
 
+        printTableHeader(String.format("%-3s", "#"),
+                String.format("%-15s", "Order ID"),
+                String.format("%-22s", "Status"),
+                String.format("%12s", "Amount"));
         for (int i = 0; i < orders.size(); i++) {
-            System.out.printf("  %d. %s - %s - NPR %,.2f%n", i + 1,
-                    orders.get(i).getOrderId(), orders.get(i).getStatus(),
-                    orders.get(i).getTotalAmount());
+            Order o = orders.get(i);
+            printTableRow(
+                    String.format("%-3d", i + 1),
+                    String.format("%-15s", o.getOrderId()),
+                    badgeCell(o.getStatus()),
+                    String.format("%12s", fmt(o.getTotalAmount())));
         }
+        printTableFooter(String.format("%-3s", "#"),
+                String.format("%-15s", "Order ID"),
+                String.format("%-22s", "Status"),
+                String.format("%12s", "Amount"));
+
         int choice = input.readInt("  Select order: ") - 1;
         if (choice < 0 || choice >= orders.size()) return;
 
         Order order = orders.get(choice);
-        System.out.println("\n  Current state: " + order.getStatus());
-        System.out.println("  1. Confirm  2. Prepare  3. Deliver  4. Complete  5. Cancel");
-        int action = input.readInt("  Action: ");
+        info("\n  \u25B6 Current: " + ConsoleStyle.statusBadge(order.getStatus()));
+        System.out.println("    1. Confirm  2. Prepare  3. Deliver  4. Complete  5. Cancel");
+        int action = input.readInt("    Action: ");
 
-        System.out.print("  [State] " + order.getStatus() + " -> ");
-        switch (action) {
-            case 1 -> { order.confirm(); orderDAO.updateStatus(order.getOrderId(), "CONFIRMED"); }
-            case 2 -> { order.prepare(); orderDAO.updateStatus(order.getOrderId(), "PREPARING"); }
-            case 3 -> { order.deliver(); orderDAO.updateStatus(order.getOrderId(), "OUT_FOR_DELIVERY"); }
-            case 4 -> {
-                order.complete();
-                orderDAO.updateStatus(order.getOrderId(), "DELIVERED");
+        String target = switch (action) {
+            case 1 -> { order.confirm(); yield "CONFIRMED"; }
+            case 2 -> { order.prepare(); yield "PREPARING"; }
+            case 3 -> { order.deliver(); yield "OUT_FOR_DELIVERY"; }
+            case 4 -> { order.complete(); yield "DELIVERED"; }
+            case 5 -> { order.cancel(); yield "CANCELLED"; }
+            default -> null;
+        };
+
+        if (target == null) {
+            fail("    \u2717 Invalid action.");
+        } else if (target.equals(order.getStatus())) {
+            // Transition accepted by the state machine — persist it
+            orderDAO.updateStatus(order.getOrderId(), target);
+            if (target.equals("DELIVERED")) {
                 notificationDAO.saveNotification(order.getOrderId(), order.getCustomer().getName(),
                         "Your order " + order.getOrderId() + " has been delivered!");
             }
-            case 5 -> { order.cancel(); orderDAO.updateStatus(order.getOrderId(), "CANCELLED"); }
+            info("    \u2192 " + ConsoleStyle.statusBadge(order.getStatus()) + " (saved to database)");
+        } else {
+            fail("    \u2717 Transition to " + target + " rejected by the state machine \u2014 database unchanged.");
         }
-        System.out.println(order.getStatus());
         input.pressEnter();
     }
 
-    /**
-     * Generates an order report using the Proxy pattern for access control.
-     * AuthProxy checks whether the current user has the ADMIN role
-     * before delegating to the real OrderService.
-     */
     private void generateReport() {
-        System.out.println("\n=========================================");
-        System.out.println("  PROXY PATTERN - GENERATE REPORT");
-        System.out.println("=========================================");
+        printHeader("GENERATE REPORT");
+        printSubheader("Proxy Pattern \u2014 Access control via AuthProxy");
 
         IOrderService proxy = new AuthProxy(currentUser, new OrderService());
-        System.out.println("  [Proxy] " + currentUser.getName() +
+        info("  \u25B6 " + currentUser.getName() +
                 " (" + currentUser.getRole() + ") requesting report...");
 
         String report = proxy.generateReport("SUMMARY");
         if (report.equals("Access Denied")) {
-            System.out.println("  [Proxy] ACCESS DENIED: Only ADMIN can generate reports.");
+            fail("  \u2717 [Proxy] ACCESS DENIED: Only ADMIN can generate reports.");
         } else {
-            System.out.println("  [Proxy] Access granted.");
-            System.out.println("\n" + report);
+            ok("  \u2714 [Proxy] Access granted.");
+            printSeparator();
+            System.out.println(report);
+            printSeparator();
 
             List<Order> allOrders = orderDAO.findAll();
             if (!allOrders.isEmpty()) {
@@ -702,61 +776,87 @@ public class InteractiveMenu {
         input.pressEnter();
     }
 
-    /** Admin menu management — view, add, or toggle availability of menu items. */
     private void manageMenu() {
-        System.out.println("\n=========================================");
-        System.out.println("  MANAGE MENU");
-        System.out.println("=========================================");
-        System.out.println("  1. View All Items");
-        System.out.println("  2. Add New Item");
-        System.out.println("  3. Toggle Availability");
-        int c = input.readInt("  Choice: ");
+        printHeader("MANAGE MENU");
+        System.out.println("    1. View All Items");
+        System.out.println("    2. Add New Item");
+        System.out.println("    3. Toggle Availability");
+        int c = input.readInt("    Choice: ");
         switch (c) {
-            case 1 -> menuItemDAO.findAll().forEach(item ->
-                    System.out.println("  - " + item.getDescription() +
-                            " - NPR " + String.format("%,.2f", item.getPrice())));
+            case 1 -> {
+                List<MenuItem> all = menuItemDAO.findAll();
+                if (all.isEmpty()) {
+                    System.out.println("    No items.");
+                } else {
+                    printTableHeader(String.format("%-3s", "#"),
+                            String.format("%-27s", "Item"),
+                            String.format("%12s", "Price"));
+                    for (int i = 0; i < all.size(); i++) {
+                        MenuItem mi = all.get(i);
+                        printTableRow(
+                                String.format("%-3d", i + 1),
+                                String.format("%-27s", mi.getDescription()),
+                                String.format("%12s", fmt(mi.getPrice())));
+                    }
+                    printTableFooter(String.format("%-3s", "#"),
+                            String.format("%-27s", "Item"),
+                            String.format("%12s", "Price"));
+                }
+            }
             case 2 -> {
-                String name = input.readLine("  Name: ");
-                double price = input.readDouble("  Price: ");
-                System.out.println(menuItemDAO.addItem(name, price) ? "  Added." : "  Failed.");
+                String name = input.readLine("    Name: ");
+                double price = input.readDouble("    Price: ");
+                if (menuItemDAO.addItem(name, price)) {
+                    ok("    \u2714 Added.");
+                } else {
+                    fail("    \u2717 Failed.");
+                }
             }
             case 3 -> {
-                String name = input.readLine("  Item name: ");
-                boolean avail = input.readYesNo("  Available?");
+                String name = input.readLine("    Item name: ");
+                boolean avail = input.readYesNo("    Available?");
                 menuItemDAO.toggleAvailability(name, avail);
+                ok("    \u2714 Updated.");
             }
         }
         input.pressEnter();
     }
 
-    /** Displays all notifications in the system. */
     private void viewAllNotifications() {
-        System.out.println("\n=========================================");
-        System.out.println("  NOTIFICATIONS (OBSERVER PATTERN)");
-        System.out.println("=========================================");
+        printHeader("ALL NOTIFICATIONS");
+        printSubheader("Observer Pattern \u2014 System-wide notifications");
         notificationDAO.printNotificationsForUser("%");
         input.pressEnter();
     }
 
     // ==================== DELIVERY FEATURES ====================
 
-    /** Lists all orders that are currently out for delivery. */
     private void viewOutForDelivery() {
-        System.out.println("\n=========================================");
-        System.out.println("  OUT FOR DELIVERY");
-        System.out.println("=========================================");
-        orderDAO.findAll().stream()
+        printHeader("OUT FOR DELIVERY");
+        List<Order> deliveries = orderDAO.findAll().stream()
                 .filter(o -> o.getStatus().equals("OUT_FOR_DELIVERY"))
-                .forEach(o -> System.out.printf("  %s - %s - NPR %,.2f%n",
-                        o.getOrderId(), o.getCustomer().getName(), o.getTotalAmount()));
+                .toList();
+        if (deliveries.isEmpty()) {
+            System.out.println("  No orders out for delivery.");
+        } else {
+            printTableHeader(String.format("%-15s", "Order ID"),
+                    String.format("%-20s", "Customer"),
+                    String.format("%12s", "Amount"));
+            for (Order o : deliveries) {
+                printTableRow(
+                        String.format("%-15s", o.getOrderId()),
+                        String.format("%-20s", o.getCustomer().getName()),
+                        String.format("%12s", fmt(o.getTotalAmount())));
+            }
+            printTableFooter(String.format("%-15s", "Order ID"),
+                    String.format("%-20s", "Customer"),
+                    String.format("%12s", "Amount"));
+        }
         input.pressEnter();
     }
 
-    /** Marks an out-for-delivery order as delivered, triggering state transition and notification. */
     private void markDelivered() {
-        System.out.println("\n=========================================");
-        System.out.println("  MARK DELIVERED");
-        System.out.println("=========================================");
+        printHeader("MARK DELIVERED");
         List<Order> deliveries = orderDAO.findAll().stream()
                 .filter(o -> o.getStatus().equals("OUT_FOR_DELIVERY"))
                 .toList();
@@ -765,30 +865,166 @@ public class InteractiveMenu {
             input.pressEnter();
             return;
         }
+        printTableHeader(String.format("%-3s", "#"),
+                String.format("%-15s", "Order ID"),
+                String.format("%-20s", "Customer"));
         for (int i = 0; i < deliveries.size(); i++) {
-            System.out.printf("  %d. %s - %s%n", i + 1,
-                    deliveries.get(i).getOrderId(), deliveries.get(i).getCustomer().getName());
+            Order o = deliveries.get(i);
+            printTableRow(
+                    String.format("%-3d", i + 1),
+                    String.format("%-15s", o.getOrderId()),
+                    String.format("%-20s", o.getCustomer().getName()));
         }
+        printTableFooter(String.format("%-3s", "#"),
+                String.format("%-15s", "Order ID"),
+                String.format("%-20s", "Customer"));
         int choice = input.readInt("  Select: ") - 1;
         if (choice >= 0 && choice < deliveries.size()) {
             Order o = deliveries.get(choice);
             o.complete();
-            orderDAO.updateStatus(o.getOrderId(), "DELIVERED");
-            notificationDAO.saveNotification(o.getOrderId(), o.getCustomer().getName(),
-                    "Your order " + o.getOrderId() + " has been delivered!");
-            System.out.println("  Delivered!");
+            if ("DELIVERED".equals(o.getStatus())) {
+                orderDAO.updateStatus(o.getOrderId(), "DELIVERED");
+                notificationDAO.saveNotification(o.getOrderId(), o.getCustomer().getName(),
+                        "Your order " + o.getOrderId() + " has been delivered!");
+                ok("  \u2714 Delivered!");
+            } else {
+                fail("  \u2717 Could not deliver \u2014 order is not out for delivery.");
+            }
         }
         input.pressEnter();
     }
 
-    // ==================== HELPERS ====================
+    // ==================== UI FORMATTING HELPERS ====================
 
-    /** Prints the application welcome banner once at startup. */
     private void printBanner() {
+        String title = "FOODIEEXPRESS - ONLINE FOOD ORDERING";
+        String sub = "11 GoF Design Patterns | PostgreSQL";
+        int inner = Math.max(title.length(), sub.length()) + 4;
+        String bar = "\u2550".repeat(inner);
         System.out.println();
-        System.out.println("╔═══════════════════════════════════════════╗");
-        System.out.println("║    FOODIEEXPRESS - ONLINE FOOD ORDERING   ║");
-        System.out.println("║    11 GoF Design Patterns | PostgreSQL   ║");
-        System.out.println("╚═══════════════════════════════════════════╝");
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u2554" + bar + "\u2557"));
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u2551")
+                + ConsoleStyle.bold(ConsoleStyle.paint(ConsoleStyle.BRIGHT_CYAN,
+                        String.format("%-" + inner + "s", "  " + title)))
+                + ConsoleStyle.paint(ConsoleStyle.CYAN, "\u2551"));
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u2551")
+                + ConsoleStyle.paint(ConsoleStyle.DIM,
+                        String.format("%-" + inner + "s", "      " + sub))
+                + ConsoleStyle.paint(ConsoleStyle.CYAN, "\u2551"));
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u255A" + bar + "\u255D"));
+    }
+
+    private void printHeader(String title) {
+        String line = "\u2500".repeat(title.length() + 6);
+        String border = ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u250C" + line + "\u2510");
+        String bottom = ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u2514" + line + "\u2518");
+        System.out.println(border);
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u2502   ")
+                + ConsoleStyle.bold(ConsoleStyle.paint(ConsoleStyle.BRIGHT_CYAN, title))
+                + ConsoleStyle.paint(ConsoleStyle.CYAN, "   \u2502"));
+        System.out.println(bottom);
+    }
+
+    private void printSubheader(String title) {
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.MAGENTA, "  \u2500\u2500 " + title + " \u2500\u2500"));
+    }
+
+    private void printSeparator() {
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.DIM, "  " + "\u2500".repeat(55)));
+    }
+
+    /**
+     * Draws a themed menu box with a colored border and a bold title.
+     * The box width adapts to the longest option so all menus align.
+     */
+    private void printMenuBox(String icon, String title, List<String> options) {
+        int inner = Math.max(title.length() + 2,
+                options.stream().mapToInt(String::length).max().orElse(0));
+        String bar = "\u2500".repeat(inner + 2);
+        String border = ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u250C" + bar + "\u2510");
+        String mid = ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u251C" + bar + "\u2524");
+        String bottom = ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u2514" + bar + "\u2518");
+
+        System.out.println(border);
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u2502 ")
+                + ConsoleStyle.bold(ConsoleStyle.paint(ConsoleStyle.BRIGHT_CYAN,
+                        String.format("%-" + inner + "s", icon + " " + title)))
+                + ConsoleStyle.paint(ConsoleStyle.CYAN, " \u2502"));
+        System.out.println(mid);
+        for (String opt : options) {
+            System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u2502 ")
+                    + ConsoleStyle.paint(ConsoleStyle.BRIGHT_WHITE,
+                            String.format("%-" + inner + "s", opt))
+                    + ConsoleStyle.paint(ConsoleStyle.CYAN, " \u2502"));
+        }
+        System.out.println(bottom);
+    }
+
+    /** Painted status badge, right-padded to the fixed table column width. */
+    private String badgeCell(String status) {
+        return ConsoleStyle.paint(ConsoleStyle.statusColor(status),
+                String.format("%-22s", ConsoleStyle.statusSymbol(status)));
+    }
+
+    private void ok(String msg) {
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.GREEN, msg));
+    }
+
+    private void fail(String msg) {
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.RED, msg));
+    }
+
+    private void info(String msg) {
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, msg));
+    }
+
+    private void warn(String msg) {
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.YELLOW, msg));
+    }
+
+    private String fmt(double amount) {
+        return "NPR " + String.format("%,.2f", amount);
+    }
+
+    private void printTableHeader(String... columns) {
+        StringBuilder sb = new StringBuilder("  \u250C");
+        for (int i = 0; i < columns.length; i++) {
+            if (i > 0) sb.append("\u252C");
+            sb.append("\u2500".repeat(columns[i].length() + 2));
+        }
+        sb.append("\u2510");
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, sb.toString()));
+
+        sb = new StringBuilder("  \u2502");
+        for (String col : columns) {
+            sb.append(" ").append(col).append(" \u2502");
+        }
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.BRIGHT_CYAN, sb.toString()));
+
+        sb = new StringBuilder("  \u251C");
+        for (int i = 0; i < columns.length; i++) {
+            if (i > 0) sb.append("\u253C");
+            sb.append("\u2500".repeat(columns[i].length() + 2));
+        }
+        sb.append("\u2524");
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, sb.toString()));
+    }
+
+    private void printTableRow(String... cells) {
+        StringBuilder sb = new StringBuilder("  \u2502");
+        for (String cell : cells) {
+            sb.append(" ").append(cell).append(" \u2502");
+        }
+        System.out.println(sb);
+    }
+
+    private void printTableFooter(String... columns) {
+        StringBuilder sb = new StringBuilder("  \u2514");
+        for (int i = 0; i < columns.length; i++) {
+            if (i > 0) sb.append("\u2534");
+            sb.append("\u2500".repeat(columns[i].length() + 2));
+        }
+        sb.append("\u2518");
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, sb.toString()));
     }
 }

@@ -1,5 +1,7 @@
 package com.foodordering.command;
 
+import com.foodordering.interactive.ConsoleStyle;
+
 import java.util.Stack;
 
 /**
@@ -16,7 +18,7 @@ public class CommandInvoker {
 
     /** Executes a command and adds it to the undo history. */
     public void executeCommand(OrderCommand command) {
-        System.out.println("  Executing: " + command.getDescription());
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, "  Executing: " + command.getDescription()));
         command.execute();
         history.push(command);
     }
@@ -25,10 +27,10 @@ public class CommandInvoker {
     public void undoLastCommand() {
         if (!history.isEmpty()) {
             OrderCommand command = history.pop();
-            System.out.println("  Undoing: " + command.getDescription());
+            System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, "  Undoing: " + command.getDescription()));
             command.undo();
         } else {
-            System.out.println("  No commands to undo.");
+            System.out.println(ConsoleStyle.paint(ConsoleStyle.YELLOW, "  No commands to undo."));
         }
     }
 

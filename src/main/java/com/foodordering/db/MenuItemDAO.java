@@ -28,7 +28,7 @@ public class MenuItemDAO {
             while (rs.next()) {
                 items.add(new BaseMenuItem(rs.getString("name"), rs.getDouble("base_price")));
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("  [DB] Menu load error: " + e.getMessage());
         }
         return items;
@@ -43,7 +43,7 @@ public class MenuItemDAO {
             while (rs.next()) {
                 items.add(new BaseMenuItem(rs.getString("name"), rs.getDouble("base_price")));
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("  [DB] Menu load error: " + e.getMessage());
         }
         return items;
@@ -57,7 +57,7 @@ public class MenuItemDAO {
             stmt.setDouble(2, price);
             stmt.executeUpdate();
             return true;
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("  [DB] Add menu item error: " + e.getMessage());
             return false;
         }
@@ -70,7 +70,7 @@ public class MenuItemDAO {
             stmt.setBoolean(1, available);
             stmt.setString(2, name);
             return stmt.executeUpdate() > 0;
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("  [DB] Toggle availability error: " + e.getMessage());
             return false;
         }

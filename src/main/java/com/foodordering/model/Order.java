@@ -21,6 +21,7 @@ public class Order {
     private List<OrderItem> items;
     private DeliveryStrategy deliveryStrategy;
     private String paymentMethod;
+    private double subtotal;
     private double totalAmount;
     private double taxAmount;
     private double deliveryCharge;
@@ -46,6 +47,7 @@ public class Order {
     public DeliveryStrategy getDeliveryStrategy() { return deliveryStrategy; }
     public String getPaymentMethod() { return paymentMethod; }
     public double getTotalAmount() { return totalAmount; }
+    public double getSubtotal() { return subtotal; }
     public double getTaxAmount() { return taxAmount; }
     public double getDeliveryCharge() { return deliveryCharge; }
     public OrderState getCurrentState() { return currentState; }
@@ -54,6 +56,7 @@ public class Order {
     public void setItems(List<OrderItem> items) { this.items = items; }
     public void setDeliveryStrategy(DeliveryStrategy s) { this.deliveryStrategy = s; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+    public void setSubtotal(double subtotal) { this.subtotal = subtotal; }
     public void setTotalAmount(double totalAmount) { this.totalAmount = totalAmount; }
     public void setTaxAmount(double taxAmount) { this.taxAmount = taxAmount; }
     public void setDeliveryCharge(double deliveryCharge) { this.deliveryCharge = deliveryCharge; }

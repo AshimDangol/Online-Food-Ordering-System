@@ -65,6 +65,7 @@ public class OrderBuilder {
         double taxRate = RestaurantConfig.getInstance().getTaxRate();
         this.taxAmount = subtotal * taxRate;
         double total = subtotal + taxAmount + deliveryCharge;
+        order.setSubtotal(subtotal);
         order.setTotalAmount(total);
         order.setTaxAmount(this.taxAmount);
         order.setDeliveryCharge(this.deliveryCharge);

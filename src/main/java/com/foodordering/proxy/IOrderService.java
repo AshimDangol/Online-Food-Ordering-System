@@ -9,5 +9,6 @@ import com.foodordering.model.Order;
 public interface IOrderService {
     void placeOrder(Order order);
     void cancelOrder(String orderId);
+    void restoreOrder(String orderId, String status);
     String generateReport(String reportType);
 }

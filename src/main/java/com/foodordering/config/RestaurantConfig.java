@@ -1,5 +1,9 @@
 package com.foodordering.config;
 
+import com.foodordering.interactive.ConsoleStyle;
+
+import java.util.Arrays;
+
 /**
  * Singleton Pattern — Ensures only one configuration instance exists.
  * Centralizes restaurant-wide settings (name, address, tax rate, delivery fees).
@@ -46,15 +50,37 @@ public class RestaurantConfig {
 
     /** Displays configuration details in formatted console output. */
     public void display() {
-        System.out.println("=========================================");
-        System.out.println("  SINGLETON PATTERN - RESTAURANT CONFIG");
-        System.out.println("=========================================");
-        System.out.println("Restaurant   : " + restaurantName);
-        System.out.println("Address      : " + address);
-        System.out.println("Phone        : " + phone);
-        System.out.println("Hours        : " + operatingHours);
-        System.out.println("Tax Rate     : " + (taxRate * 100) + "%");
-        System.out.println("Delivery Fee : NPR " + String.format("%,.2f", deliveryFeePerKm) + " per km");
+        String header = "SINGLETON \u2014 RESTAURANT CONFIG";
+        String[] rows = {
+                "Restaurant : " + restaurantName,
+                "Address    : " + address,
+                "Phone      : " + phone,
+                "Hours      : " + operatingHours,
+                "Tax Rate   : " + (taxRate * 100) + "%",
+                "Delivery   : " + "NPR " + String.format("%,.2f", deliveryFeePerKm) + "/km"
+        };
+        int inner = Math.max(header.length() + 2,
+                Arrays.stream(rows).mapToInt(String::length).max().orElse(0));
+        String bar = "\u2500".repeat(inner + 2);
+        String border = ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u250C" + bar + "\u2510");
+        String mid = ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u251C" + bar + "\u2524");
+        String bottom = ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u2514" + bar + "\u2518");
+
         System.out.println();
+        System.out.println(border);
+        System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u2502 ")
+                + ConsoleStyle.bold(ConsoleStyle.paint(ConsoleStyle.BRIGHT_CYAN,
+                        String.format("%-" + inner + "s", header)))
+                + ConsoleStyle.paint(ConsoleStyle.CYAN, " \u2502"));
+        System.out.println(mid);
+        for (String row : rows) {
+            String[] parts = row.split(": ", 2);
+            System.out.println(ConsoleStyle.paint(ConsoleStyle.CYAN, "  \u2502 ")
+                    + ConsoleStyle.paint(ConsoleStyle.DIM,
+                            String.format("%-" + inner + "s",
+                                    parts[0] + ": " + ConsoleStyle.paint(ConsoleStyle.BRIGHT_WHITE, parts[1])))
+                    + ConsoleStyle.paint(ConsoleStyle.CYAN, " \u2502"));
+        }
+        System.out.println(bottom);
     }
 }

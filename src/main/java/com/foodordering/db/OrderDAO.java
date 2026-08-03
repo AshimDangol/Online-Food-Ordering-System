@@ -21,40 +21,60 @@ public class OrderDAO {
 
     /**
      * Persists an order and all its line items to the database.
+     * The order header and its line items are saved in a single
+     * transaction so a failure cannot leave an orphaned order.
      *
      * @param order The fully constructed Order domain object
      * @return true if the order was saved successfully
      */
     public boolean saveOrder(Order order) {
+        Connection conn = getConn();
+        if (conn == null) return false;
         String sql = "INSERT INTO orders (id, customer_id, customer_name, delivery_strategy, payment_method, " +
                 "subtotal, tax_amount, delivery_charge, total_amount, status) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement stmt = getConn().prepareStatement(sql)) {
-            stmt.setString(1, order.getOrderId());
-            stmt.setString(2, order.getCustomer().getId());
-            stmt.setString(3, order.getCustomer().getName());
-            stmt.setString(4, order.getDeliveryStrategy() != null ? order.getDeliveryStrategy().getStrategyName() : null);
-            stmt.setString(5, order.getPaymentMethod());
-            stmt.setDouble(6, order.calculateTotal());
-            stmt.setDouble(7, order.getTaxAmount());
-            stmt.setDouble(8, order.getDeliveryCharge());
-            stmt.setDouble(9, order.getTotalAmount());
-            stmt.setString(10, order.getStatus());
-            stmt.executeUpdate();
-
-            saveOrderItems(order);
+        boolean oldAutoCommit = true;
+        try {
+            oldAutoCommit = conn.getAutoCommit();
+            conn.setAutoCommit(false);
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, order.getOrderId());
+                stmt.setString(2, order.getCustomer().getId());
+                stmt.setString(3, order.getCustomer().getName());
+                stmt.setString(4, order.getDeliveryStrategy() != null ? order.getDeliveryStrategy().getStrategyName() : null);
+                stmt.setString(5, order.getPaymentMethod());
+                stmt.setDouble(6, order.getSubtotal());
+                stmt.setDouble(7, order.getTaxAmount());
+                stmt.setDouble(8, order.getDeliveryCharge());
+                stmt.setDouble(9, order.getTotalAmount());
+                stmt.setString(10, order.getStatus());
+                stmt.executeUpdate();
+            }
+            saveOrderItems(conn, order);
+            conn.commit();
             return true;
-        } catch (SQLException e) {
+        } catch (Exception e) {
+            try {
+                conn.rollback();
+            } catch (SQLException rollbackEx) {
+                // ignore — original failure is reported below
+            }
             System.err.println("  [DB] Save order error: " + e.getMessage());
             return false;
+        } finally {
+            try {
+                conn.setAutoCommit(oldAutoCommit);
+            } catch (SQLException ignored) {
+                // ignore — connection may already be broken
+            }
         }
     }
 
     /** Inserts each line item linked to the parent order. */
-    private void saveOrderItems(Order order) throws SQLException {
+    private void saveOrderItems(Connection conn, Order order) throws SQLException {
         String sql = "INSERT INTO order_items (order_id, item_description, unit_price, quantity, total_price) " +
                 "VALUES (?, ?, ?, ?, ?)";
-        try (PreparedStatement stmt = getConn().prepareStatement(sql)) {
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             for (OrderItem oi : order.getItems()) {
                 stmt.setString(1, order.getOrderId());
                 stmt.setString(2, oi.getDescription());
@@ -73,7 +93,7 @@ public class OrderDAO {
             stmt.setString(1, status);
             stmt.setString(2, orderId);
             return stmt.executeUpdate() > 0;
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("  [DB] Update status error: " + e.getMessage());
             return false;
         }
@@ -89,7 +109,7 @@ public class OrderDAO {
             while (rs.next()) {
                 orders.add(mapOrderSummary(rs));
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("  [DB] Find by customer error: " + e.getMessage());
         }
         return orders;
@@ -104,7 +124,7 @@ public class OrderDAO {
             while (rs.next()) {
                 orders.add(mapOrderSummary(rs));
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("  [DB] Find all error: " + e.getMessage());
         }
         return orders;
@@ -114,6 +134,8 @@ public class OrderDAO {
      * Maps a database row to an Order domain object.
      * Restores the correct OrderState implementation based on the status column,
      * so the State pattern continues to work after deserialization.
+     * Line items, tax, and delivery charge are also restored so a reloaded
+     * order is a faithful copy of the original.
      */
     private Order mapOrderSummary(ResultSet rs) throws SQLException {
         Customer customer = new Customer(
@@ -122,16 +144,45 @@ public class OrderDAO {
                 "", "", "");
         Order order = new Order(rs.getString("id"), customer);
         order.setPaymentMethod(rs.getString("payment_method"));
+        order.setSubtotal(rs.getDouble("subtotal"));
+        order.setTaxAmount(rs.getDouble("tax_amount"));
+        order.setDeliveryCharge(rs.getDouble("delivery_charge"));
         order.setTotalAmount(rs.getDouble("total_amount"));
-        String status = rs.getString("status");
-        order.setState(switch (status) {
+        order.setState(fromStatus(rs.getString("status")));
+        order.setItems(loadItems(order.getOrderId()));
+        // Re-attach observers so the Observer pattern fires on later state
+        // transitions of persisted orders (e.g. admin processing).
+        order.attach(new com.foodordering.observer.CustomerNotifier());
+        order.attach(new com.foodordering.observer.RestaurantNotifier());
+        order.attach(new com.foodordering.observer.DeliveryNotifier());
+        return order;
+    }
+
+    /** Loads the line items belonging to an order. */
+    private List<OrderItem> loadItems(String orderId) throws SQLException {
+        List<OrderItem> items = new ArrayList<>();
+        String sql = "SELECT item_description, unit_price, quantity FROM order_items WHERE order_id = ?";
+        try (PreparedStatement stmt = getConn().prepareStatement(sql)) {
+            stmt.setString(1, orderId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                items.add(new OrderItem(
+                        new BaseMenuItem(rs.getString("item_description"), rs.getDouble("unit_price")),
+                        rs.getInt("quantity")));
+            }
+        }
+        return items;
+    }
+
+    /** Maps a status string to the matching OrderState implementation. */
+    public static com.foodordering.state.OrderState fromStatus(String status) {
+        return switch (status == null ? "" : status) {
             case "CONFIRMED" -> new com.foodordering.state.ConfirmedState();
             case "PREPARING" -> new com.foodordering.state.PreparingState();
             case "OUT_FOR_DELIVERY" -> new com.foodordering.state.OutForDeliveryState();
             case "DELIVERED" -> new com.foodordering.state.DeliveredState();
             case "CANCELLED" -> new com.foodordering.state.CancelledState();
             default -> new com.foodordering.state.PendingState();
-        });
-        return order;
+        };
     }
 }

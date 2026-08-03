@@ -2,8 +2,13 @@ package com.foodordering.db;
 
 import com.foodordering.model.*;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 
 /**
@@ -20,10 +25,11 @@ public class UserDAO {
 
     /**
      * Inserts a new user into the database with the given password.
+     * Passwords are stored salted and hashed as "salt:hexhash".
      * Maps role-specific fields (phone, address, department, vehicle) based on User subclass.
      *
      * @param user     The User domain object (Customer, Admin, or DeliveryPartner)
-     * @param password The plaintext password to store
+     * @param password The plaintext password to hash and store
      * @return true if registration succeeded
      */
     public boolean registerUser(User user, String password) {
@@ -33,7 +39,7 @@ public class UserDAO {
             stmt.setString(1, user.getId());
             stmt.setString(2, user.getName());
             stmt.setString(3, user.getEmail());
-            stmt.setString(4, password);
+            stmt.setString(4, hashPassword(password));
             stmt.setString(5, user.getRole());
             if (user instanceof Customer c) {
                 stmt.setString(6, c.getPhone());
@@ -58,7 +64,7 @@ public class UserDAO {
             }
             stmt.executeUpdate();
             return true;
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("  [DB] Registration error: " + e.getMessage());
             return false;
         }
@@ -66,24 +72,58 @@ public class UserDAO {
 
     /**
      * Authenticates a user by email and password.
+     * Compares the salted SHA-256 hash of the supplied password against
+     * the stored value. Legacy plaintext rows (no "salt:" prefix) are
+     * still accepted for backward compatibility.
      *
      * @param email    The user's email address
      * @param password The user's password
      * @return The matching User domain object, or null if authentication fails
      */
     public User authenticate(String email, String password) {
-        String sql = "SELECT * FROM users WHERE email = ? AND password = ?";
+        String sql = "SELECT * FROM users WHERE email = ?";
         try (PreparedStatement stmt = getConn().prepareStatement(sql)) {
             stmt.setString(1, email);
-            stmt.setString(2, password);
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
-                return mapUser(rs);
+                String stored = rs.getString("password");
+                if (matchesPassword(password, stored)) {
+                    return mapUser(rs);
+                }
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("  [DB] Auth error: " + e.getMessage());
         }
         return null;
+    }
+
+    /** Hashes a password with a random salt: returns "salt:hexhash". */
+    private String hashPassword(String password) {
+        String salt = Long.toHexString(new SecureRandom().nextLong());
+        return salt + ":" + sha256Hex(salt + password);
+    }
+
+    /** Verifies a plaintext password against a stored "salt:hexhash" (or legacy plaintext). */
+    private boolean matchesPassword(String password, String stored) {
+        if (stored == null) return false;
+        int sep = stored.indexOf(':');
+        if (sep > 0) {
+            String salt = stored.substring(0, sep);
+            String expected = stored.substring(sep + 1);
+            return sha256Hex(salt + password).equalsIgnoreCase(expected);
+        }
+        // Legacy row stored in plaintext before hashing was introduced
+        return stored.equals(password);
+    }
+
+    /** SHA-256 hex digest of the given string. */
+    private String sha256Hex(String input) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(md.digest(input.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
     }
 
     /** Finds a user by their unique ID. */
@@ -95,7 +135,7 @@ public class UserDAO {
             if (rs.next()) {
                 return mapUser(rs);
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("  [DB] Find error: " + e.getMessage());
         }
         return null;
@@ -110,7 +150,7 @@ public class UserDAO {
             if (rs.next()) {
                 return mapUser(rs);
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("  [DB] Find error: " + e.getMessage());
         }
         return null;
@@ -126,7 +166,7 @@ public class UserDAO {
             while (rs.next()) {
                 users.add(mapUser(rs));
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("  [DB] Find error: " + e.getMessage());
         }
         return users;
@@ -141,7 +181,7 @@ public class UserDAO {
             while (rs.next()) {
                 users.add(mapUser(rs));
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("  [DB] Find all error: " + e.getMessage());
         }
         return users;

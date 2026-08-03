@@ -81,6 +81,13 @@ public class OrderFacade {
         orders.remove(orderId);
     }
 
+    /** Restores an order to a previous state (used by Command undo). */
+    public void restoreOrder(String orderId, String status, User requester) {
+        AuthProxy proxy = new AuthProxy(requester, sharedOrderService);
+        proxy.restoreOrder(orderId, status);
+        orders.remove(orderId);
+    }
+
     /** Returns the current status of an order. */
     public String trackOrder(String orderId) {
         Order order = orders.get(orderId);

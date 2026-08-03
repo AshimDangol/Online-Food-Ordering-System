@@ -19,6 +19,7 @@ public class DatabaseManager {
 
     private static DatabaseManager instance;
     private Connection connection;
+    private boolean dbDownMessagePrinted;
 
     /** Private constructor — initializes the connection and creates tables if needed. */
     private DatabaseManager() {
@@ -27,7 +28,7 @@ public class DatabaseManager {
             connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
             createTables();
         } catch (SQLException e) {
-            System.err.println("  [DB] Failed to initialize database: " + e.getMessage());
+            printDbDownMessage();
         }
     }
 
@@ -54,11 +55,22 @@ public class DatabaseManager {
         try {
             if (connection == null || connection.isClosed()) {
                 connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+                dbDownMessagePrinted = false;
             }
         } catch (SQLException e) {
-            System.err.println("  [DB] Failed to reconnect: " + e.getMessage());
+            connection = null;
+            printDbDownMessage();
         }
         return connection;
+    }
+
+    /** Prints a friendly message (once per outage) when PostgreSQL cannot be reached. */
+    private void printDbDownMessage() {
+        if (!dbDownMessagePrinted) {
+            System.err.println("  [DB] Cannot connect to PostgreSQL at " + DB_URL);
+            System.err.println("       Is PostgreSQL running on port 5432 with database 'foodordering'?");
+            dbDownMessagePrinted = true;
+        }
     }
 
     /** Creates all required tables and seeds initial menu items. */
@@ -124,6 +136,10 @@ public class DatabaseManager {
                         "(7, 'Chowmein', 200.0, TRUE), " +
                         "(8, 'Coke', 100.0, TRUE) " +
                         "ON CONFLICT (id) DO NOTHING");
+                // Explicit-id inserts do not advance the SERIAL sequence, so sync it to
+                // the current max id. Without this, the next addItem() would collide
+                // with an existing primary key and fail.
+                stmt.execute("SELECT setval('menu_items_id_seq', (SELECT COALESCE(MAX(id), 1) FROM menu_items))");
             } catch (SQLException e) {
                 // Ignore duplicate key on re-run — menu items already seeded
             }

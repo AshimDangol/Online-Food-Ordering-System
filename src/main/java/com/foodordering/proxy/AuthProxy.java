@@ -49,6 +49,18 @@ public class AuthProxy implements IOrderService {
     }
 
     @Override
+    public void restoreOrder(String orderId, String status) {
+        if (!"CUSTOMER".equals(currentUser.getRole()) && !"ADMIN".equals(currentUser.getRole())) {
+            System.out.println("  [AuthProxy] ACCESS DENIED: " + currentUser.getRole()
+                    + " cannot restore orders.");
+            return;
+        }
+        System.out.println("  [AuthProxy] Access granted to " + currentUser.getName()
+                + " (" + currentUser.getRole() + ") for order restoration.");
+        realService.restoreOrder(orderId, status);
+    }
+
+    @Override
     public String generateReport(String reportType) {
         if (!"ADMIN".equals(currentUser.getRole())) {
             System.out.println("  [AuthProxy] ACCESS DENIED: Only ADMIN can generate reports.");
