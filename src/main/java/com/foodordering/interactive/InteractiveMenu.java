@@ -63,6 +63,8 @@ public class InteractiveMenu {
      * Starts the main application loop.
      * Displays the auth menu when no user is logged in,
      * or the role-based main menu after authentication.
+     * Every iteration is guarded so an unexpected error returns the user
+     * to the menu instead of crashing the application.
      */
     public void start() {
         RestaurantConfig.getInstance();
@@ -82,12 +84,33 @@ public class InteractiveMenu {
             return;
         }
 
+        int consecutiveErrors = 0;
         while (true) {
             System.out.println();
-            if (currentUser == null) {
-                showAuthMenu();
-            } else {
-                showMainMenu();
+            try {
+                if (currentUser == null) {
+                    showAuthMenu();
+                } else {
+                    showMainMenu();
+                }
+                consecutiveErrors = 0;
+            } catch (RuntimeException e) {
+                // Unexpected failure in a menu handler: log it, tell the user,
+                // and fall back to the menu instead of terminating the app.
+                fail("  \u2717 An unexpected error occurred: " + e.getMessage());
+                e.printStackTrace();
+                if (++consecutiveErrors >= 5) {
+                    fail("  \u2717 Too many consecutive errors. Shutting down.");
+                    DatabaseManager.getInstance().shutdown();
+                    return;
+                }
+                input.pressEnter();
+            } catch (Error e) {
+                // Serious JVM-level failures (e.g. StackOverflowError) — report and stop.
+                fail("  \u2717 Fatal error: " + e.getMessage());
+                e.printStackTrace();
+                DatabaseManager.getInstance().shutdown();
+                return;
             }
         }
     }
