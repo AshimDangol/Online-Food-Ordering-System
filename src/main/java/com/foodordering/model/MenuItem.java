@@ -11,4 +11,9 @@ public interface MenuItem {
 
     /** @return Total price after all decorations are applied */
     double getPrice();
+
+    /** @return Whether this item can currently be ordered (decorators keep the base flag) */
+    default boolean isAvailable() {
+        return true;
+    }
 }

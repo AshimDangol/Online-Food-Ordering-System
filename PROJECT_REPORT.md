@@ -175,7 +175,7 @@ The PostgreSQL database `foodordering` is automatically created on first run wit
 | `menu_items` | id, name, base_price, available | Menu catalog (pre-populated with 8 items) |
 | `orders` | id, customer_id, customer_name, delivery_strategy, payment_method, subtotal, tax_amount, delivery_charge, total_amount, status, created_at | Order records with lifecycle status |
 | `order_items` | id, order_id, item_description, unit_price, quantity, total_price | Line items within each order |
-| `notifications` | id, order_id, recipient, message, created_at | Notification log for observer pattern |
+| `notifications` | id, order_id, recipient, recipient_id, message, created_at | Notification log for observer pattern, keyed by recipient user id (`recipient_id`) with a denormalized display name (`recipient`) |
 
 ### Database Access Layer
 
@@ -187,7 +187,7 @@ The `com.foodordering.db` package contains:
 - **`OrderDAO`** — Order persistence and status updates
 - **`NotificationDAO`** — Notification logging and retrieval
 
-The database is served by a local PostgreSQL instance. Connect via pgAdmin at `localhost:5432`, database `foodordering`, user `postgres`. Credentials and URLs can be overridden via the `FOOD_DB_URL`, `FOOD_DB_USER`, and `FOOD_DB_PASS` environment variables. Delivery partner availability is persisted in the `users.available` column and editable from the delivery partner's Settings menu.
+The database is served by a local PostgreSQL instance. Connect via pgAdmin at `localhost:5432`, database `foodordering`, user `postgres`. Credentials and URLs can be overridden via the `FOOD_DB_URL`, `FOOD_DB_USER`, and `FOOD_DB_PASS` environment variables. Delivery partner availability is persisted in the `users.available` column, editable from the delivery partner's Settings menu, and **enforced** — a partner marked UNAVAILABLE cannot view or mark deliveries. Reloaded orders restore their full state, including the delivery strategy (`orders.delivery_strategy`), so estimated times remain available after restart. Notifications are keyed by user id, so a customer renaming their account keeps their notification history and never inherits another user's notifications.
 
 ## 8. UML Class Diagram
 
@@ -397,7 +397,7 @@ User created: Dev Rai [DELIVERY] - dev@email.com
 #### Facade — `OrderFacade`
 **Problem:** Placing an order involves interacting with the Builder (construction), Adapter (payment), and Proxy (persistence/authorization). Exposing all these subsystems to client code creates tight coupling and steep learning curves.
 
-**Solution:** `OrderFacade` provides a single `placeOrder()` method that internally orchestrates the Builder for order construction, the PaymentAdapter for payment processing, and the AuthProxy for authorized persistence. Additional convenience methods (`cancelOrder()`, `trackOrder()`, `generateReport()`) further simplify client interaction.
+**Solution:** `OrderFacade` provides a single `placeOrder()` method that internally orchestrates the Builder for order construction, the PaymentAdapter for payment processing, and the AuthProxy for authorized persistence. Additional convenience methods (`cancelOrder()`, `restoreOrder()`, `trackOrder()`) further simplify client interaction.
 
 **Applicable SOLID Principles:** Dependency Inversion — the Facade depends on abstractions (IOrderService, PaymentGateway) rather than concrete implementations.
 
@@ -481,14 +481,14 @@ Each state rejects invalid transitions with clear console messages, providing se
 | **S**ingle Responsibility | Each class has one reason to change: `RestaurantConfig` manages config, `AuthProxy` controls access, `PaymentAdapter` adapts APIs |
 | **O**pen/Closed | New strategies, decorators, commands, states, and user types can be added without modifying existing code |
 | **L**iskov Substitution | Any `DeliveryStrategy` works with `OrderBuilder`; any `MenuItem` (decorated or not) works with `OrderItem` |
-| **I**nterface Segregation | Interfaces are small and focused: `MenuItem` (2 methods), `OrderCommand` (3 methods), `OrderState` (6 methods), `OrderObserver` (1 method) |
+| **I**nterface Segregation | Interfaces are small and focused: `MenuItem` (3 methods, one defaulted), `OrderCommand` (3 methods), `OrderState` (6 methods), `OrderObserver` (1 method) |
 | **D**ependency Inversion | `OrderFacade` depends on `IOrderService` and `PaymentGateway` abstractions, not concrete implementations |
 
 ---
 
 ## 12. JUnit Test Results
 
-All 19 JUnit tests pass, covering every design pattern individually, database operations, plus a full integration workflow (database tests are skipped automatically when PostgreSQL is not reachable):
+All 24 JUnit tests pass, covering every design pattern individually, database operations, plus a full integration workflow (database tests are skipped automatically when PostgreSQL is not reachable):
 
 | Test | Pattern / Area | What It Verifies | Result |
 |---|---|---|---|
@@ -511,11 +511,16 @@ All 19 JUnit tests pass, covering every design pattern individually, database op
 | `testDatabaseOrderPersistence` | Database | Save and retrieve orders via PostgreSQL (quantity suffix not doubled, test rows cleaned up) | ✅ |
 | `testDatabaseProfileUpdate` | Database | Update profile (name/phone/address) and change password via PostgreSQL | ✅ |
 | `testCancelRejectedOutForDelivery` | Command/State | Out-for-delivery orders rejected by cancel, status unchanged | ✅ |
+| `testDatabaseStrategyRestore` | Database | Delivery strategy restored on reload; estimated time available after restart | ✅ |
+| `testProxyDeniesDeliveryRole` | Proxy | DELIVERY role cannot place or cancel orders (proxy denial is enforced, not cosmetic) | ✅ |
+| `testDatabaseAvailabilityPersist` | Database | Delivery partner availability flag survives a profile update and reload | ✅ |
+| `testDatabaseNotificationRenameByUserId` | Database | Notifications keyed by user id; rename never leaks rows to same-name users | ✅ |
+| `testCommandInvokerRecordsOnlySuccesses` | Command | Invoker records only successful commands; failed ones are not undoable | ✅ |
 
 **Test Command:** `mvn test`
 
 ```
-Tests run: 19, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 24, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
@@ -596,7 +601,7 @@ src/main/java/com/foodordering/
 └── report/ReportGenerator.java       # Report generation
 
 src/test/java/com/foodordering/
-└── FoodOrderingSystemTest.java       # 19 JUnit tests
+└── FoodOrderingSystemTest.java       # 24 JUnit tests
 
 data/                                 # (reserved — not used with PostgreSQL)
 docs/
@@ -641,7 +646,7 @@ This project successfully demonstrates the integration of **11 GoF Design Patter
 
 The patterns collaborate naturally — for example, `OrderFacade` (Facade) uses `OrderBuilder` (Builder) to construct an order, `PaymentAdapter` (Adapter) to process payment, and `AuthProxy` (Proxy) to persist with authorization. The `Order` object itself serves as both the State Context (delegating to `OrderState`) and the Observer Subject (notifying `OrderObserver` implementations).
 
-The system follows SOLID principles throughout, is fully tested with 19 JUnit tests, and produces clearly formatted console output identifying each pattern in use. The architecture is extensible — new user types, payment gateways, delivery strategies, item extras, order states, and commands can be added without modifying existing code.
+The system follows SOLID principles throughout, is fully tested with 24 JUnit tests, and produces clearly formatted console output identifying each pattern in use. The architecture is extensible — new user types, payment gateways, delivery strategies, item extras, order states, and commands can be added without modifying existing code.
 
 ---
 

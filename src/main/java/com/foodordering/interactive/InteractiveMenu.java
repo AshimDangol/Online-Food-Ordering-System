@@ -11,7 +11,6 @@ import com.foodordering.observer.*;
 import com.foodordering.proxy.AuthProxy;
 import com.foodordering.proxy.IOrderService;
 import com.foodordering.proxy.OrderService;
-import com.foodordering.report.ReportGenerator;
 import com.foodordering.strategy.*;
 
 import java.util.*;
@@ -219,6 +218,7 @@ public class InteractiveMenu {
             }
             default -> {
                 fail("  Invalid.");
+                input.pressEnter();
                 return;
             }
         }
@@ -569,7 +569,7 @@ public class InteractiveMenu {
             if (order != null) {
                 boolean saved = orderDAO.saveOrder(order);
                 if (saved) {
-                    notificationDAO.saveNotification(orderId, customer.getName(),
+                    notificationDAO.saveNotification(orderId, customer.getId(), customer.getName(),
                             "Order " + orderId + " placed successfully.");
                     printSeparator();
                     System.out.println(ConsoleStyle.bold(ConsoleStyle.paint(ConsoleStyle.BRIGHT_YELLOW,
@@ -578,6 +578,7 @@ public class InteractiveMenu {
                     System.out.println("    Customer : " + customer.getName());
                     System.out.println("    Items    : " + items.size() + " item(s)");
                     System.out.println("    Delivery : " + strategy.getStrategyName());
+                    System.out.println("    ETA      : " + strategy.getEstimatedTime());
                     System.out.println("    Payment  : " + paymentMethod);
                     System.out.println("    Total    : " + ConsoleStyle.paint(ConsoleStyle.BRIGHT_YELLOW, fmt(order.getTotalAmount())));
                     printSeparator();
@@ -646,7 +647,18 @@ public class InteractiveMenu {
             orders.stream()
                     .filter(o -> o.getOrderId().equalsIgnoreCase(oid))
                     .findFirst().ifPresentOrElse(
-                            o -> System.out.println("  Current state: " + ConsoleStyle.statusBadge(o.getStatus())),
+                            o -> {
+                                System.out.println("  Current state : " + ConsoleStyle.statusBadge(o.getStatus()));
+                                System.out.println("  Line items    : " + o.getItems().size());
+                                DeliveryStrategy s = o.getDeliveryStrategy();
+                                if (s != null) {
+                                    System.out.println("  Delivery      : " + s.getStrategyName()
+                                            + " \u2014 ETA " + s.getEstimatedTime());
+                                } else {
+                                    System.out.println("  Delivery      : Unknown");
+                                }
+                                System.out.println("  Total amount  : " + fmt(o.getTotalAmount()));
+                            },
                             () -> fail("  \u2717 Not found."));
         }
         input.pressEnter();
@@ -690,13 +702,18 @@ public class InteractiveMenu {
         String previousStatus = toCancel.getStatus();
         CancelOrderCommand cmd = new CancelOrderCommand(
                 new OrderFacade(currentUser), toCancel.getOrderId(), currentUser, previousStatus);
-        commandInvoker.executeCommand(cmd);
+        boolean executed = commandInvoker.executeCommand(cmd);
 
         // The command (via facade -> proxy -> OrderService) ran the state machine
         // and persisted only on a valid transition. Verify against the database
         // rather than trusting the session cache.
         Order after = orderDAO.findByOrderId(toCancel.getOrderId());
-        if (after != null && "CANCELLED".equals(after.getStatus())) {
+        if (!executed) {
+            fail("  \u2717 Cancellation rejected by the state machine \u2014 database unchanged.");
+        } else if (after == null) {
+            warn("  \u26A0 Cancelled in this session, but the order has no database record "
+                    + "(it was never persisted), so nothing was written to the database.");
+        } else if ("CANCELLED".equals(after.getStatus())) {
             info("  \u25B6 [Command] executed. History size: " + commandInvoker.getHistorySize());
             if (input.readYesNo("  Undo? [Command Undo]")) {
                 commandInvoker.undoLastCommand();
@@ -708,7 +725,7 @@ public class InteractiveMenu {
                 }
             }
         } else {
-            fail("  \u2717 Cancellation rejected by the state machine \u2014 database unchanged.");
+            warn("  \u26A0 Order is now " + after.getStatus() + " in the database \u2014 not cancelled.");
         }
         input.pressEnter();
     }
@@ -716,7 +733,7 @@ public class InteractiveMenu {
     private void viewNotifications() {
         printHeader("NOTIFICATIONS");
         printSubheader("Observer Pattern \u2014 Event-driven notifications");
-        notificationDAO.printNotificationsForUser(currentUser.getName());
+        notificationDAO.printNotificationsForUser(currentUser.getId(), currentUser.getName());
         input.pressEnter();
     }
 
@@ -794,7 +811,11 @@ public class InteractiveMenu {
             case 3 -> order.deliver();
             case 4 -> order.complete();
             case 5 -> order.cancel();
-            default -> fail("    \u2717 Invalid action.");
+            default -> {
+                fail("    \u2717 Invalid action.");
+                input.pressEnter();
+                return;
+            }
         }
 
         String after = order.getStatus();
@@ -805,10 +826,12 @@ public class InteractiveMenu {
         } else {
             orderDAO.updateStatus(order.getOrderId(), after);
             if ("DELIVERED".equals(after)) {
-                notificationDAO.saveNotification(order.getOrderId(), order.getCustomer().getName(),
+                notificationDAO.saveNotification(order.getOrderId(), order.getCustomer().getId(),
+                        order.getCustomer().getName(),
                         "Your order " + order.getOrderId() + " has been delivered!");
             } else if ("CANCELLED".equals(after)) {
-                notificationDAO.saveNotification(order.getOrderId(), order.getCustomer().getName(),
+                notificationDAO.saveNotification(order.getOrderId(), order.getCustomer().getId(),
+                        order.getCustomer().getName(),
                         "Order " + order.getOrderId() + " cancelled.");
             }
             info("    \u2192 " + ConsoleStyle.statusBadge(after) + " (saved to database)");
@@ -832,11 +855,6 @@ public class InteractiveMenu {
             printSeparator();
             System.out.println(report);
             printSeparator();
-
-            List<Order> allOrders = orderDAO.findAll();
-            if (!allOrders.isEmpty()) {
-                new ReportGenerator().generateOrderReport(allOrders);
-            }
         }
         input.pressEnter();
     }
@@ -855,26 +873,36 @@ public class InteractiveMenu {
                 } else {
                     printTableHeader(String.format("%-3s", "#"),
                             String.format("%-27s", "Item"),
-                            String.format("%12s", "Price"));
+                            String.format("%12s", "Price"),
+                            String.format("%12s", "Available"));
                     for (int i = 0; i < all.size(); i++) {
                         MenuItem mi = all.get(i);
+                        String avail = mi.isAvailable() ? "Yes" : "No";
                         printTableRow(
                                 String.format("%-3d", i + 1),
                                 String.format("%-27s", mi.getDescription()),
-                                String.format("%12s", fmt(mi.getPrice())));
+                                String.format("%12s", fmt(mi.getPrice())),
+                                String.format("%12s", avail));
                     }
                     printTableFooter(String.format("%-3s", "#"),
                             String.format("%-27s", "Item"),
-                            String.format("%12s", "Price"));
+                            String.format("%12s", "Price"),
+                            String.format("%12s", "Available"));
                 }
             }
             case 2 -> {
                 String name = input.readLine("    Name: ");
-                double price = input.readDouble("    Price: ");
-                if (menuItemDAO.addItem(name, price)) {
-                    ok("    \u2714 Added.");
+                if (name.isBlank()) {
+                    fail("    \u2717 Name cannot be empty.");
                 } else {
-                    fail("    \u2717 Failed.");
+                    double price = input.readDouble("    Price: ");
+                    if (price < 0) {
+                        fail("    \u2717 Price cannot be negative.");
+                    } else if (menuItemDAO.addItem(name, price)) {
+                        ok("    \u2714 Added.");
+                    } else {
+                        fail("    \u2717 Failed.");
+                    }
                 }
             }
             case 3 -> {
@@ -893,7 +921,7 @@ public class InteractiveMenu {
     private void viewAllNotifications() {
         printHeader("ALL NOTIFICATIONS");
         printSubheader("Observer Pattern \u2014 System-wide notifications");
-        notificationDAO.printNotificationsForUser("%");
+        notificationDAO.printAllNotifications();
         input.pressEnter();
     }
 
@@ -901,6 +929,10 @@ public class InteractiveMenu {
 
     private void viewOutForDelivery() {
         printHeader("OUT FOR DELIVERY");
+        if (!deliveryPartnerAvailable()) {
+            input.pressEnter();
+            return;
+        }
         List<Order> deliveries = orderDAO.findAll().stream()
                 .filter(o -> o.getStatus().equals("OUT_FOR_DELIVERY"))
                 .toList();
@@ -925,6 +957,10 @@ public class InteractiveMenu {
 
     private void markDelivered() {
         printHeader("MARK DELIVERED");
+        if (!deliveryPartnerAvailable()) {
+            input.pressEnter();
+            return;
+        }
         List<Order> deliveries = orderDAO.findAll().stream()
                 .filter(o -> o.getStatus().equals("OUT_FOR_DELIVERY"))
                 .toList();
@@ -952,7 +988,8 @@ public class InteractiveMenu {
             o.complete();
             if ("DELIVERED".equals(o.getStatus())) {
                 orderDAO.updateStatus(o.getOrderId(), "DELIVERED");
-                notificationDAO.saveNotification(o.getOrderId(), o.getCustomer().getName(),
+                notificationDAO.saveNotification(o.getOrderId(), o.getCustomer().getId(),
+                        o.getCustomer().getName(),
                         "Your order " + o.getOrderId() + " has been delivered!");
                 ok("  \u2714 Delivered!");
             } else {
@@ -963,6 +1000,19 @@ public class InteractiveMenu {
     }
 
     // ==================== ACCOUNT SETTINGS ====================
+
+    /**
+     * Blocks delivery work when the partner is marked UNAVAILABLE.
+     * The availability flag is functional, not just display-only.
+     */
+    private boolean deliveryPartnerAvailable() {
+        if (currentUser instanceof DeliveryPartner partner && !partner.isAvailable()) {
+            warn("  \u26A0 You are marked UNAVAILABLE for deliveries.");
+            System.out.println("    Toggle your availability to AVAILABLE in Settings (option 3) before taking orders.");
+            return false;
+        }
+        return true;
+    }
 
     /**
      * Profile management for all roles: view profile, change name, email,
@@ -1058,9 +1108,9 @@ public class InteractiveMenu {
         }
         String oldName = currentUser.getName();
         currentUser.setName(name);
-        if (persistProfile("Name updated")) {
+        if (persistProfile("Name updated", () -> currentUser.setName(oldName))) {
             // Keep notification history visible under the new name
-            notificationDAO.renameRecipient(oldName, name);
+            notificationDAO.renameRecipient(currentUser.getId(), name);
         }
     }
 
@@ -1080,8 +1130,9 @@ public class InteractiveMenu {
             fail("  \u2717 Email already in use by another account.");
             return;
         }
+        String oldEmail = currentUser.getEmail();
         currentUser.setEmail(email);
-        persistProfile("Email updated");
+        persistProfile("Email updated", () -> currentUser.setEmail(oldEmail));
     }
 
     private void changePassword() {
@@ -1115,8 +1166,10 @@ public class InteractiveMenu {
             fail("  \u2717 Phone cannot be empty.");
             return;
         }
-        ((Customer) currentUser).setPhone(phone);
-        persistProfile("Phone updated");
+        Customer c = (Customer) currentUser;
+        String oldPhone = c.getPhone();
+        c.setPhone(phone);
+        persistProfile("Phone updated", () -> c.setPhone(oldPhone));
     }
 
     private void changeAddress() {
@@ -1126,8 +1179,10 @@ public class InteractiveMenu {
             fail("  \u2717 Address cannot be empty.");
             return;
         }
-        ((Customer) currentUser).setAddress(address);
-        persistProfile("Address updated");
+        Customer c = (Customer) currentUser;
+        String oldAddress = c.getAddress();
+        c.setAddress(address);
+        persistProfile("Address updated", () -> c.setAddress(oldAddress));
     }
 
     private void changeDepartment() {
@@ -1137,8 +1192,10 @@ public class InteractiveMenu {
             fail("  \u2717 Department cannot be empty.");
             return;
         }
-        ((Admin) currentUser).setDepartment(department);
-        persistProfile("Department updated");
+        Admin a = (Admin) currentUser;
+        String oldDepartment = a.getDepartment();
+        a.setDepartment(department);
+        persistProfile("Department updated", () -> a.setDepartment(oldDepartment));
     }
 
     private void changeVehicle() {
@@ -1148,8 +1205,10 @@ public class InteractiveMenu {
             fail("  \u2717 Vehicle number cannot be empty.");
             return;
         }
-        ((DeliveryPartner) currentUser).setVehicleNumber(vehicle);
-        persistProfile("Vehicle number updated");
+        DeliveryPartner d = (DeliveryPartner) currentUser;
+        String oldVehicle = d.getVehicleNumber();
+        d.setVehicleNumber(vehicle);
+        persistProfile("Vehicle number updated", () -> d.setVehicleNumber(oldVehicle));
     }
 
     /** Toggles the delivery partner's availability flag and persists it. */
@@ -1158,19 +1217,25 @@ public class InteractiveMenu {
         DeliveryPartner partner = (DeliveryPartner) currentUser;
         boolean newState = !partner.isAvailable();
         if (input.readYesNo("  Mark yourself " + (newState ? "AVAILABLE" : "UNAVAILABLE"))) {
+            boolean oldState = partner.isAvailable();
             partner.setAvailable(newState);
             persistProfile(newState
                     ? "You are now available for deliveries"
-                    : "You are now unavailable for deliveries");
+                    : "You are now unavailable for deliveries",
+                    () -> partner.setAvailable(oldState));
         }
     }
 
-    /** Persists the live currentUser via UserDAO and reports the result. @return true on success */
-    private boolean persistProfile(String successMsg) {
+    /** Persists the live currentUser via UserDAO and reports the result.
+     *  On failure the session object is restored to {@code revert} so the
+     *  in-memory user never diverges from the database.
+     *  @return true on success */
+    private boolean persistProfile(String successMsg, Runnable revert) {
         if (userDAO.updateProfile(currentUser)) {
             ok("  \u2714 " + successMsg);
             return true;
         }
+        revert.run();
         fail("  \u2717 Update failed \u2014 please try again.");
         return false;
     }

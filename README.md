@@ -74,7 +74,7 @@ src/main/java/com/foodordering/
 └── report/ReportGenerator.java       # Report generation
 
 src/test/java/com/foodordering/
-└── FoodOrderingSystemTest.java       # 19 JUnit tests
+└── FoodOrderingSystemTest.java       # 24 JUnit tests
 
 data/                                 # (reserved — not used with PostgreSQL)
 docs/
@@ -99,7 +99,7 @@ mvn clean compile
 ```bash
 mvn test
 ```
-All **19 tests** pass, covering every pattern, database operations, plus a full integration workflow. Database tests are skipped automatically when PostgreSQL is unreachable.
+All **24 tests** pass, covering every pattern, database operations, plus a full integration workflow. Database tests are skipped automatically when PostgreSQL is unreachable.
 
 ### Run Interactive App
 ```bash
@@ -133,6 +133,11 @@ The PostgreSQL database `foodordering` is auto-created on `localhost:5432` on fi
 | 17     | Database        | Save and retrieve orders via PostgreSQL             | ✅ |
 | 18     | Database        | Update profile and change password via PostgreSQL   | ✅ |
 | 19     | Command         | Cancellation rejected for OUT_FOR_DELIVERY orders   | ✅ |
+| 20     | Database        | Delivery strategy restored on reload                | ✅ |
+| 21     | Proxy           | Delivery role cannot place or cancel orders         | ✅ |
+| 22     | Database        | Delivery availability flag persists                 | ✅ |
+| 23     | Database        | Notifications keyed by user id, rename-safe         | ✅ |
+| 24     | Command         | Invoker records only successful commands            | ✅ |
 
 ---
 

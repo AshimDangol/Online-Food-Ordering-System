@@ -63,14 +63,18 @@ package "Model" as model {
   interface MenuItem <<Decorator.Component>> {
     + getDescription(): String
     + getPrice(): double
+    + isAvailable(): boolean
   }
 
   class BaseMenuItem {
     - name: String
     - price: double
+    - available: boolean
     + BaseMenuItem(name, price)
+    + BaseMenuItem(name, price, available)
     + getDescription(): String
     + getPrice(): double
+    + isAvailable(): boolean
   }
 
   class OrderItem {
@@ -79,7 +83,6 @@ package "Model" as model {
     + OrderItem(item, quantity)
     + getItem(): MenuItem
     + getQuantity(): int
-    + setQuantity(int): void
     + getTotalPrice(): double
     + getDescription(): String
     + toString(): String
@@ -250,14 +253,13 @@ package "Facade" as facade {
     + cancelOrder(String, User): boolean
     + restoreOrder(String, String, User): boolean
     + trackOrder(String): String
-    + generateReport(User): String
     + getOrder(String): Order
   }
 }
 
 package "Proxy" as proxy {
   interface IOrderService <<Proxy.Subject>> {
-    + placeOrder(Order): void
+    + placeOrder(Order): boolean
     + cancelOrder(String): boolean
     + restoreOrder(String, String): boolean
     + generateReport(String): String
@@ -265,7 +267,7 @@ package "Proxy" as proxy {
 
   class OrderService {
     - {static} orderStore: Map<String, Order>
-    + placeOrder(Order): void
+    + placeOrder(Order): boolean
     + cancelOrder(String): boolean
     + restoreOrder(String, String): boolean
     + generateReport(String): String
@@ -276,7 +278,7 @@ package "Proxy" as proxy {
     - currentUser: User
     + AuthProxy(User, OrderService)
     + AuthProxy(User)
-    + placeOrder(Order): void
+    + placeOrder(Order): boolean
     + cancelOrder(String): boolean
     + restoreOrder(String, String): boolean
     + generateReport(String): String
@@ -392,7 +394,7 @@ package "Command" as command {
   class CommandInvoker {
     - history: Stack<OrderCommand>
     + CommandInvoker()
-    + executeCommand(OrderCommand): void
+    + executeCommand(OrderCommand): boolean
     + undoLastCommand(): void
     + getHistorySize(): int
   }
@@ -504,14 +506,20 @@ package "Database Layer" as db {
   class OrderDAO {
     + saveOrder(Order): boolean
     + updateStatus(String, String): boolean
+    + findByOrderId(String): Order
     + findByCustomerId(String): List<Order>
     + findAll(): List<Order>
+    + deleteOrder(String): boolean
     + {static} fromStatus(String): OrderState
+    + {static} fromStrategyName(String): DeliveryStrategy
   }
 
   class NotificationDAO {
-    + saveNotification(String, String, String): void
-    + printNotificationsForUser(String): void
+    + saveNotification(String, String, String, String): void
+    + renameRecipient(String, String): void
+    + listNotifications(String, String): List<String>
+    + printNotificationsForUser(String, String): void
+    + printAllNotifications(): void
   }
 }
 
@@ -635,8 +643,6 @@ PayPalAdapter --> PayPalGateway : wraps
 
 CommandInvoker --> OrderCommand : executes
 
-InteractiveMenu --> ReportGenerator : uses
-
 ' -- DB Layer relationships --
 note right of DatabaseManager : <<also Singleton>>
 UserDAO --> DatabaseManager : uses
@@ -653,7 +659,6 @@ InteractiveMenu --> InputHelper : uses
 InteractiveMenu --> CommandInvoker : uses
 InteractiveMenu --> OrderFacade : uses
 InteractiveMenu --> AuthProxy : uses
-InteractiveMenu --> ReportGenerator : uses
 InteractiveMenu --> "*" UserFactory : creates users
 
 ' -- Factory Method creates --

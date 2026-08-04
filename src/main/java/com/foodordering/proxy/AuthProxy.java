@@ -30,15 +30,16 @@ public class AuthProxy implements IOrderService {
     }
 
     @Override
-    public void placeOrder(Order order) {
+    public boolean placeOrder(Order order) {
         if (!"CUSTOMER".equals(currentUser.getRole()) && !"ADMIN".equals(currentUser.getRole())) {
             System.out.println("  [AuthProxy] ACCESS DENIED: " + currentUser.getRole()
                     + " cannot place orders.");
-            return;
+            return false;
         }
         System.out.println("  [AuthProxy] Access granted to " + currentUser.getName()
                 + " (" + currentUser.getRole() + ") for placing order.");
         realService.placeOrder(order);
+        return true;
     }
 
     @Override

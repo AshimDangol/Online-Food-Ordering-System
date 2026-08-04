@@ -41,7 +41,8 @@ public class MenuItemDAO {
         try (Statement stmt = getConn().createStatement()) {
             ResultSet rs = stmt.executeQuery(sql);
             while (rs.next()) {
-                items.add(new BaseMenuItem(rs.getString("name"), rs.getDouble("base_price")));
+                items.add(new BaseMenuItem(rs.getString("name"), rs.getDouble("base_price"),
+                        rs.getBoolean("available")));
             }
         } catch (Exception e) {
             System.err.println("  [DB] Menu load error: " + e.getMessage());

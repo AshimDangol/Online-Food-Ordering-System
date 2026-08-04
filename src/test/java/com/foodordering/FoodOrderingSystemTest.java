@@ -515,4 +515,158 @@ class FoodOrderingSystemTest {
         assertEquals("OUT_FOR_DELIVERY", order.getStatus(),
                 "Rejected cancellation must not change the status");
     }
+
+    @Test
+    @org.junit.jupiter.api.Order(20)
+    @DisplayName("Database - Delivery strategy restored on reload")
+    void testDatabaseStrategyRestore() {
+        assumeTrue(com.foodordering.db.DatabaseManager.getInstance().getConnection() != null,
+                "PostgreSQL not available - skipping database test");
+        String ts = String.valueOf(System.currentTimeMillis());
+        String custId = "DB-STR-" + ts.substring(ts.length() - 6);
+        String email = "strategy" + ts.substring(ts.length() - 6) + "@test.com";
+
+        com.foodordering.db.UserDAO userDAO = new com.foodordering.db.UserDAO();
+        com.foodordering.db.OrderDAO orderDAO = new com.foodordering.db.OrderDAO();
+
+        Order order = null;
+        try {
+            UserFactory cf = new CustomerFactory();
+            Customer cust = (Customer) cf.createUser(custId, "Strategy User", email,
+                    "9800000000|Ktm");
+            userDAO.registerUser(cust, "pass");
+
+            OrderBuilder builder = new OrderBuilder(cust)
+                    .addItem(new BaseMenuItem("Item", 100.0), 1)
+                    .setDeliveryStrategy(new ExpressDeliveryStrategy(), 2.0)
+                    .setPaymentMethod("KHALTI");
+            order = builder.build();
+            assertTrue(orderDAO.saveOrder(order), "Order should be saved");
+
+            Order reloaded = orderDAO.findByOrderId(order.getOrderId());
+            assertNotNull(reloaded);
+            assertNotNull(reloaded.getDeliveryStrategy(),
+                    "Reloaded order must restore its delivery strategy");
+            assertTrue(reloaded.getDeliveryStrategy() instanceof ExpressDeliveryStrategy);
+            assertEquals("15-20 minutes", reloaded.getDeliveryStrategy().getEstimatedTime());
+        } finally {
+            if (order != null) orderDAO.deleteOrder(order.getOrderId());
+            userDAO.deleteUser(custId);
+        }
+    }
+
+    @Test
+    @org.junit.jupiter.api.Order(21)
+    @DisplayName("Proxy - Delivery role cannot place or cancel orders")
+    void testProxyDeniesDeliveryRole() {
+        DeliveryPartner partner = new DeliveryPartner("D900", "Partner", "d@t.com", "BA 1 PA 1234");
+        Customer cust = new Customer("U900", "Cust", "c@t.com", "9800000000", "Ktm");
+        OrderFacade facade = new OrderFacade(partner);
+
+        String orderId = facade.placeOrder(cust,
+                Arrays.asList(new BaseMenuItem("Item", 100.0)), List.of(1),
+                new StandardDeliveryStrategy(), 1.0, "KHALTI", new ArrayList<>());
+        assertNull(orderId, "Delivery partners must not be able to place orders");
+
+        IOrderService proxy = new AuthProxy(partner);
+        assertFalse(proxy.cancelOrder("ORD-NOPE"), "Delivery partners must not cancel orders");
+    }
+
+    @Test
+    @org.junit.jupiter.api.Order(22)
+    @DisplayName("Database - Delivery availability flag persists")
+    void testDatabaseAvailabilityPersist() {
+        assumeTrue(com.foodordering.db.DatabaseManager.getInstance().getConnection() != null,
+                "PostgreSQL not available - skipping database test");
+        String ts = String.valueOf(System.currentTimeMillis());
+        String id = "DB-AVL-" + ts.substring(ts.length() - 6);
+        String email = "avail" + ts.substring(ts.length() - 6) + "@test.com";
+
+        com.foodordering.db.UserDAO userDAO = new com.foodordering.db.UserDAO();
+        try {
+            DeliveryPartnerFactory df = new DeliveryPartnerFactory();
+            DeliveryPartner partner = (DeliveryPartner) df.createUser(id, "Avail User", email,
+                    "BA 1 PA 0001");
+            assertTrue(userDAO.registerUser(partner, "pass"));
+
+            partner.setAvailable(false);
+            assertTrue(userDAO.updateProfile(partner), "Availability should be persisted");
+
+            User fetched = userDAO.findById(id);
+            assertNotNull(fetched);
+            assertFalse(((DeliveryPartner) fetched).isAvailable(),
+                    "Reloaded partner should be unavailable");
+        } finally {
+            userDAO.deleteUser(id);
+        }
+    }
+
+    @Test
+    @org.junit.jupiter.api.Order(23)
+    @DisplayName("Database - Notification rename keys on user id, not name")
+    void testDatabaseNotificationRenameByUserId() {
+        assumeTrue(com.foodordering.db.DatabaseManager.getInstance().getConnection() != null,
+                "PostgreSQL not available - skipping database test");
+        String ts = String.valueOf(System.currentTimeMillis());
+        String custId = "DB-NTF-" + ts.substring(ts.length() - 6);
+        String email = "notif" + ts.substring(ts.length() - 6) + "@test.com";
+
+        com.foodordering.db.UserDAO userDAO = new com.foodordering.db.UserDAO();
+        com.foodordering.db.OrderDAO orderDAO = new com.foodordering.db.OrderDAO();
+        com.foodordering.db.NotificationDAO notificationDAO = new com.foodordering.db.NotificationDAO();
+
+        Order order = null;
+        try {
+            UserFactory cf = new CustomerFactory();
+            Customer cust = (Customer) cf.createUser(custId, "Old Name", email,
+                    "9800000000|Ktm");
+            userDAO.registerUser(cust, "pass");
+
+            OrderBuilder builder = new OrderBuilder(cust)
+                    .addItem(new BaseMenuItem("Test Item", 50.0), 1)
+                    .setDeliveryStrategy(new StandardDeliveryStrategy(), 1.0)
+                    .setPaymentMethod("KHALTI");
+            order = builder.build();
+            orderDAO.saveOrder(order);
+
+            notificationDAO.saveNotification(order.getOrderId(), cust.getId(), "Old Name",
+                    "Hello notification");
+            assertTrue(notificationDAO.listNotifications(cust.getId(), "Old Name")
+                            .contains("Hello notification"),
+                    "Notification should be visible under the original name");
+
+            notificationDAO.renameRecipient(cust.getId(), "Brand New Name");
+            assertTrue(notificationDAO.listNotifications(cust.getId(), "Brand New Name")
+                            .contains("Hello notification"),
+                    "Notification must survive a rename keyed by user id");
+            assertTrue(notificationDAO.listNotifications("SOME-OTHER-USER", "Old Name").isEmpty(),
+                    "Another user with the same name must not see this notification");
+        } finally {
+            if (order != null) orderDAO.deleteOrder(order.getOrderId());
+            userDAO.deleteUser(custId);
+        }
+    }
+
+    @Test
+    @org.junit.jupiter.api.Order(24)
+    @DisplayName("Command - Invoker records only successful commands")
+    void testCommandInvokerRecordsOnlySuccesses() {
+        CommandInvoker invoker = new CommandInvoker();
+
+        OrderCommand ok = new OrderCommand() {
+            @Override public boolean execute() { return true; }
+            @Override public boolean undo() { return false; }
+            @Override public String getDescription() { return "ok"; }
+        };
+        OrderCommand failing = new OrderCommand() {
+            @Override public boolean execute() { return false; }
+            @Override public boolean undo() { return false; }
+            @Override public String getDescription() { return "failing"; }
+        };
+
+        assertTrue(invoker.executeCommand(ok), "Successful command should report success");
+        assertEquals(1, invoker.getHistorySize());
+        assertFalse(invoker.executeCommand(failing), "Failed command must report failure");
+        assertEquals(1, invoker.getHistorySize(), "Failed commands must not be recorded");
+    }
 }

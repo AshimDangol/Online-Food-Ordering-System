@@ -131,6 +131,10 @@ public class DatabaseManager {
                     "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
                     "FOREIGN KEY (order_id) REFERENCES orders(id))");
 
+            // Migration for existing databases created before notifications
+            // were keyed by user id (recipient_id links a notification to its user).
+            stmt.execute("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS recipient_id VARCHAR(20)");
+
             try {
                 stmt.execute("INSERT INTO menu_items (id, name, base_price, available) VALUES " +
                         "(1, 'Margherita Pizza', 450.0, TRUE), " +

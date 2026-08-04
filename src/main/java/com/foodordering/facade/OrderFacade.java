@@ -65,10 +65,14 @@ public class OrderFacade {
         boolean paid = payment.processPayment(order.getTotalAmount());
 
         if (paid) {
-            // Proxy pattern: authorize and persist
-            orderService.placeOrder(order);
-            orders.put(order.getOrderId(), order);
-            return order.getOrderId();
+            // Proxy pattern: authorize and persist. If the proxy denies the
+            // request (e.g. a delivery partner attempting to place an order),
+            // no order is registered and no ID is returned.
+            boolean placed = orderService.placeOrder(order);
+            if (placed) {
+                orders.put(order.getOrderId(), order);
+                return order.getOrderId();
+            }
         }
         return null;
     }
@@ -97,12 +101,6 @@ public class OrderFacade {
             return "Order " + orderId + " is " + order.getStatus();
         }
         return "Order not found.";
-    }
-
-    /** Generates a report (admin-only via proxy). */
-    public String generateReport(User requester) {
-        AuthProxy proxy = new AuthProxy(requester, sharedOrderService);
-        return proxy.generateReport("SUMMARY");
     }
 
     public Order getOrder(String orderId) {

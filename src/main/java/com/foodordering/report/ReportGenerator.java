@@ -45,8 +45,12 @@ public class ReportGenerator {
 
             totalRevenue += order.getTotalAmount();
             switch (order.getStatus()) {
+                case "CANCELLED":
+                    // Cancelled orders contributed no revenue
+                    totalRevenue -= order.getTotalAmount();
+                    cancelled++;
+                    break;
                 case "DELIVERED": delivered++; break;
-                case "CANCELLED": cancelled++; break;
                 default: active++; break;
             }
         }

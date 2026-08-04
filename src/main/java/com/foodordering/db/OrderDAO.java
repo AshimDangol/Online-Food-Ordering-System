@@ -1,6 +1,7 @@
 package com.foodordering.db;
 
 import com.foodordering.model.*;
+import com.foodordering.strategy.*;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -171,8 +172,8 @@ public class OrderDAO {
      * Maps a database row to an Order domain object.
      * Restores the correct OrderState implementation based on the status column,
      * so the State pattern continues to work after deserialization.
-     * Line items, tax, and delivery charge are also restored so a reloaded
-     * order is a faithful copy of the original.
+     * Line items, tax, delivery charge, and delivery strategy are also
+     * restored so a reloaded order is a faithful copy of the original.
      */
     private Order mapOrderSummary(ResultSet rs) throws SQLException {
         Customer customer = new Customer(
@@ -180,6 +181,7 @@ public class OrderDAO {
                 rs.getString("customer_name"),
                 "", "", "");
         Order order = new Order(rs.getString("id"), customer);
+        order.setDeliveryStrategy(fromStrategyName(rs.getString("delivery_strategy")));
         order.setPaymentMethod(rs.getString("payment_method"));
         order.setSubtotal(rs.getDouble("subtotal"));
         order.setTaxAmount(rs.getDouble("tax_amount"));
@@ -220,6 +222,21 @@ public class OrderDAO {
             case "DELIVERED" -> new com.foodordering.state.DeliveredState();
             case "CANCELLED" -> new com.foodordering.state.CancelledState();
             default -> new com.foodordering.state.PendingState();
+        };
+    }
+
+    /**
+     * Maps a persisted strategy name back to the matching DeliveryStrategy
+     * implementation, so reloaded orders can report strategy charges and ETA.
+     * @return The matching strategy, or null when the column is null/unmapped
+     */
+    public static DeliveryStrategy fromStrategyName(String name) {
+        if (name == null) return null;
+        return switch (name) {
+            case "Standard Delivery" -> new StandardDeliveryStrategy();
+            case "Express Delivery" -> new ExpressDeliveryStrategy();
+            case "Scheduled Delivery" -> new ScheduledDeliveryStrategy();
+            default -> null;
         };
     }
 }

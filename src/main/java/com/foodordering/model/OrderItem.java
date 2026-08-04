@@ -19,7 +19,6 @@ public class OrderItem {
 
     public MenuItem getItem() { return item; }
     public int getQuantity() { return quantity; }
-    public void setQuantity(int quantity) { this.quantity = quantity; }
 
     /** @return item price * quantity */
     public double getTotalPrice() {

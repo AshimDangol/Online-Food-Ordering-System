@@ -23,9 +23,10 @@ public class OrderService implements IOrderService {
     private static final Map<String, Order> orderStore = new HashMap<>();
 
     @Override
-    public void placeOrder(Order order) {
+    public boolean placeOrder(Order order) {
         orderStore.put(order.getOrderId(), order);
         System.out.println("  Order stored in system: " + order.getOrderId());
+        return true;
     }
 
     @Override
@@ -41,7 +42,8 @@ public class OrderService implements IOrderService {
             // Only persist when the order exists in the database (orders that
             // never persisted have no row and no notifications to attach).
             if (new OrderDAO().updateStatus(orderId, "CANCELLED")) {
-                new NotificationDAO().saveNotification(orderId, order.getCustomer().getName(),
+                new NotificationDAO().saveNotification(orderId, order.getCustomer().getId(),
+                        order.getCustomer().getName(),
                         "Order " + orderId + " cancelled.");
             }
             System.out.println("  Order " + orderId + " cancelled in system.");
@@ -60,7 +62,8 @@ public class OrderService implements IOrderService {
         order.setState(OrderDAO.fromStatus(status));
         orderStore.put(orderId, order);
         if (new OrderDAO().updateStatus(orderId, status)) {
-            new NotificationDAO().saveNotification(orderId, order.getCustomer().getName(),
+            new NotificationDAO().saveNotification(orderId, order.getCustomer().getId(),
+                    order.getCustomer().getName(),
                     "Order " + orderId + " restored to " + status + ".");
         }
         System.out.println("  Order " + orderId + " restored to state: " + order.getStatus());
